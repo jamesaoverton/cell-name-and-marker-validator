@@ -1,0 +1,5 @@
+.DS_Store
+.pytest_cache/
+build/
+junk/
+__pycache__/
