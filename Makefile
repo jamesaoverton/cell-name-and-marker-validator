@@ -13,11 +13,17 @@ build/pr-exact-synonyms.tsv: build/pr.owl | build
 	| sed 's!^http://purl.obolibrary.org/obo/PR_!PR:!' \
 	> $@
 
-build/normalized.tsv: src/normalize.py source.tsv | build
+build/normalized.tsv: src/normalize.py special-gates.tsv source.tsv | build
 	$^ $@
 
-build/gates.tsv: src/find-gates.py build/pr-exact-synonyms.tsv build/normalized.tsv
+build/known-gates.tsv: special-gates.tsv build/pr-exact-synonyms.tsv
+	cat $^ | cut -f 1-2 > $@
+
+build/gates.tsv: src/find-gates.py build/known-gates.tsv build/normalized.tsv
 	$^ $@
 
 build/report.tsv: src/report.py build/normalized.tsv build/gates.tsv
+	$^ $@
+
+build/summary.tsv: src/summarize.py build/report.tsv
 	$^ $@

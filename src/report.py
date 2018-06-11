@@ -2,7 +2,6 @@
 
 import argparse, csv, re
 
-
 ignore = [':']
 
 def report(gate_types, normalized):
@@ -12,9 +11,8 @@ def report(gate_types, normalized):
     if gate in ignore:
       ids.append(gate)
     else:
-      match = re.search('^(.*?)([\-\+]?)$', gate)
-      name = match.group(1)
-      level = match.group(2)
+      name = gate.rstrip('+-~')
+      level = re.search('[\-\+\~]*$', gate).group(0)
       if name in gate_types:
         ids.append(gate_types[name] + level)
       else:
@@ -44,11 +42,19 @@ def main():
   rows = csv.DictReader(args.normalized, delimiter='\t')
   with open(args.output, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
-    w.writerow(list(next(rows).keys()) + ['POPULATION_DEFNITION_TYPES'])
+    w.writerow(list(next(rows).keys()) + ['POPULATION_DEFNITION_TYPES', 'MATCHED_GATES', 'TOTAL_GATES'])
     for row in rows:
       normalized = row['POPULATION_DEFNITION_NORMALIZED']
       ids = report(gate_types, normalized)
+      matched_gates = 0
+      total_gates = 0
+      for i in ids:
+        total_gates += 1
+        if not i.startswith('['):
+          matched_gates += 1
       row['POPULATION_DEFNITION_TYPES'] = ' '.join(ids)
+      row['MATCHED_GATES'] = matched_gates
+      row['TOTAL_GATES'] = total_gates
       w.writerow(row.values())
 
 if __name__ == "__main__":

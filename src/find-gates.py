@@ -8,9 +8,9 @@ ignore = [':']
 def main():
   parser = argparse.ArgumentParser(
       description='Find matching gates')
-  parser.add_argument('synonyms',
+  parser.add_argument('recognized',
       type=argparse.FileType('r'),
-      help='a TSV file with ID and synonym')
+      help='a TSV file with ID and synonym for recognized gates')
   parser.add_argument('normalized',
       type=argparse.FileType('r'),
       help='a TSV file with normalized gates')
@@ -27,20 +27,22 @@ def main():
     normalized = row['POPULATION_DEFNITION_NORMALIZED']
     gates = re.split('\s+', normalized)
     for gate in gates:
+      gate = gate.rstrip('-+~')
       if gate not in ignore:
-        gate = gate.rstrip('-+')
         all_gates[gate] += 1
 
-  rows = csv.reader(args.synonyms, delimiter='\t')
+  rows = csv.reader(args.recognized, delimiter='\t')
   with open(args.gates, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
     w.writerow(['ID', 'gate', 'count'])
     for row in rows:
-      if row[1] in all_gates:
-        if row[1] in matched_gates:
-          print('Already matched', row[1], row[0])
-        matched_gates.add(row[1])
-        w.writerow([row[0], row[1], all_gates[row[1]]])
+      (curie, gate) = row
+      if gate in all_gates:
+        count = all_gates[gate]
+        if gate in matched_gates:
+          print('Already matched', gate, curie)
+        matched_gates.add(gate)
+        w.writerow([curie, gate, count])
     for gate in sorted(set(all_gates.keys()) - matched_gates):
       if gate:
         w.writerow([None, gate, all_gates[gate]])
