@@ -2,21 +2,16 @@
 
 import argparse, csv, re
 
-ignore = [':']
-
 def report(gate_types, normalized):
   gates = re.split('\s+', normalized)
   ids = []
   for gate in gates:
-    if gate in ignore:
-      ids.append(gate)
+    name = gate.rstrip('+-~')
+    level = re.search('[\-\+\~]*$', gate).group(0)
+    if name in gate_types:
+      ids.append(gate_types[name] + level)
     else:
-      name = gate.rstrip('+-~')
-      level = re.search('[\-\+\~]*$', gate).group(0)
-      if name in gate_types:
-        ids.append(gate_types[name] + level)
-      else:
-        ids.append('[' + name + ']' + level)
+      ids.append('[' + name + ']' + level)
   return ids
 
 def main():

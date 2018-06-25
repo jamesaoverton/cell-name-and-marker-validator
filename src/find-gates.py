@@ -3,8 +3,6 @@
 import argparse, csv, re
 from collections import defaultdict
 
-ignore = [':']
-
 def main():
   parser = argparse.ArgumentParser(
       description='Find matching gates')
@@ -28,13 +26,12 @@ def main():
     gates = re.split('\s+', normalized)
     for gate in gates:
       gate = gate.rstrip('-+~')
-      if gate not in ignore:
-        all_gates[gate] += 1
+      all_gates[gate] += 1
 
   rows = csv.reader(args.recognized, delimiter='\t')
   with open(args.gates, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
-    w.writerow(['ID', 'gate', 'count'])
+    w.writerow(['Ontology ID', 'Gate', 'Count'])
     for row in rows:
       (curie, gate) = row
       if gate in all_gates:

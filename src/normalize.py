@@ -3,70 +3,82 @@
 import argparse, csv, re
 
 
-def normalize(name, replacements, reported):
+def normalize(project, replacements, reported):
   if ': ' in reported:
     reported = re.sub('^.*:\s+', '', reported)
 
   gates = []
-  if 'LaJolla' in name:
+  if 'LaJolla' in project:
     gates = re.findall('\w+[\-\+]*', reported)
-  elif 'Emory' in name:
+  elif 'Emory' in project:
     gates = re.split(',\s+', reported)
-  elif 'IPIRC' in name:
+  elif 'IPIRC' in project:
     gates = re.split('\/', reported)
-  elif 'Watson' in name:
+  elif 'Watson' in project:
     gates = re.split('\/', reported)
-  elif 'Ltest' in name:
+  elif 'Ltest' in project:
     gates = re.split('\/', reported)
-  elif 'VRC' in name:
+  elif 'VRC' in project:
     gates = re.split('\s+AND\s+', reported)
-  elif 'Ertl' in name:
+  elif 'Ertl' in project:
     gates = re.split('\s+and\s+', reported)
-  elif 'Stanford' in name:
+  elif 'Stanford' in project:
     reported = re.sub('hi', '++', reported)
+    reported = re.sub('bri', '++', reported)
     reported = re.sub('low', '+-', reported)
     reported = re.sub(r'([\-\+])(CD\d+|CX\w+\d+|CCR\d)', r'\1/\2', reported)
-    gates = re.split('\/', reported)
-  elif 'Baylor' in name:
+    gates = re.split('\/|,\s+', reported)
+  elif 'Baylor' in project:
     reported = re.sub(',,+', ',', reported)
     reported = re.sub('hi', '++', reported)
+    reported = re.sub('bri', '++', reported)
+    reported = re.sub('br', '++', reported)
     reported = re.sub('low', '+-', reported)
     reported = re.sub('dim', '+-', reported)
+    reported = re.sub(' granulocyte', ', granulocyte', reported)
     reported = re.sub(r'([\-\+])CD(\d)', r'\1/CD\2', reported)
-    gates = re.split('\/|,\s+', reported)
-  elif 'Mayo' in name:
+    gates = re.split('\/|,\s*', reported)
+  elif 'Rochester' in project:
+    gates = re.split(';+\s*|\/', reported)
+  elif 'Mayo' in project:
     reported = re.sub(r' CD(\d)', r' /CD\1', reported)
+    reported = re.sub(r' high', r'++', reported)
     gates = re.split('\/', reported)
-  elif 'ARA06' in name:
+  elif 'ARA06' in project:
     gates = re.findall('\w+[\-\+]*', reported)
-  elif 'Center for Human Immunology' in name:
+  elif 'Center for Human Immunology' in project:
     reported = re.sub('high', '++', reported)
     gates = re.findall('\w+[\-\+]*', reported)
-  elif 'Seattle Biomed' in name:
+  elif 'Seattle Biomed' in project:
     gates = re.split('\/', reported)
-  elif 'Improving Kidney' in name:
+  elif 'Improving Kidney' in project:
     reported = re.sub('hi', '++', reported)
     reported = re.sub('low', '+-', reported)
     reported = re.sub(r'([\-\+])CD(\d)', r'\1/CD\2', reported)
     gates = re.split('\/', reported)
-  elif 'New York Influenza' in name:
+  elif 'New York Influenza' in project:
     reported = re.sub('high', '++', reported)
     reported = re.sub('low', '+-', reported)
     reported = re.sub('dim', '+-', reported)
     reported = re.sub(r'([\-\+ ])(CD\d+|CXCR\d|BCL\d|IF\w+|PD\d+|IL\d+|TNFa)', r'\1/\2', reported)
     gates = re.split('\/|,', reported)
-  elif 'Modeling Viral' in name:
+  elif 'Modeling Viral' in project:
     gates = re.split('\s+AND\s+|_AND_|\s+\+\s+', reported)
-  elif 'Immunobiology of Aging' in name:
+  elif 'Immunobiology of Aging' in project:
     reported = re.sub('hi', '++', reported)
     reported = re.sub('low', '+-', reported)
     reported = re.sub(r'([\-\+])(CD\d+|Ig\w+)', r'\1/\2', reported)
     gates = re.split('\/', reported)
-  elif 'Flow Cytometry Analysis' is name:
-    reported = re.sub(r'([\-\+])(CD\d+|Ig\w+|IL\d+|IF\w+|TNF\w+|Per\w+)', r'\1/\2', reported)
+  elif 'Flow Cytometry Analysis' in project:
+    reported = re.sub(r'(\+|\-)(CD\d+|Ig\w+|IL\d+|IF\w+|TNF\w+|Per\w+)', r'\1/\2', reported)
     gates = re.split('\/', reported)
-  elif 'Wistar' in name:
+  elif 'Wistar' in project:
     gates = re.findall('\w+[\-\+]*', reported)
+  elif 'ITN019AD' in project:
+    reported = re.sub('(\s+AND)?\s+R\d+.*$', '', reported)
+    reported = re.sub(' Bright', '++', reported)
+    reported = re.sub('\s+AND\s+', ' ', reported)
+    gates = re.split('\s+', reported)
   else:
     gates = re.split('\/|,\s*|\s+AND\s+|\s+and\s+', reported)
 
@@ -120,6 +132,7 @@ def main():
   rows = csv.DictReader(args.special, delimiter='\t')
   for row in rows:
     gate = row['Label']
+    replacements[gate] = gate # Include identity
     if 'Synonyms' in row and row['Synonyms'] is not None:
       synonyms = re.split(r',\s+', row['Synonyms'])
       for synonym in synonyms:
@@ -214,4 +227,9 @@ def test_normalize():
   reported = 'Alexa350 (high) + Alexa750 (medium)'
   assert normalize('Modeling Viral', replacements, reported) == [
     'Alexa350++', 'Alexa750+~'
+  ]
+
+  reported = 'TNFa+IFNg-'
+  assert normalize('Flow Cytometry Analysis', replacements, reported) == [
+    'TNFa+', 'IFNg-'
   ]

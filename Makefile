@@ -13,10 +13,15 @@ build/pr-exact-synonyms.tsv: build/pr.owl | build
 	| sed 's!^http://purl.obolibrary.org/obo/PR_!PR:!' \
 	> $@
 
-build/normalized.tsv: src/normalize.py special-gates.tsv source.tsv | build
+# Download a Google Sheet as TSV
+# https://docs.google.com/spreadsheets/d/1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI/edit#gid=0
+build/special-gates.tsv: | build
+	curl -L -o $@ "https://docs.google.com/spreadsheets/u/0/d/1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI/export?format=tsv"
+
+build/normalized.tsv: src/normalize.py build/special-gates.tsv source.tsv | build
 	$^ $@
 
-build/known-gates.tsv: special-gates.tsv build/pr-exact-synonyms.tsv
+build/known-gates.tsv: build/special-gates.tsv build/pr-exact-synonyms.tsv
 	cat $^ | cut -f 1-2 > $@
 
 build/gates.tsv: src/find-gates.py build/known-gates.tsv build/normalized.tsv
