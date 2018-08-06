@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HIPC Cell Validation Demo</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <style>
+body {
+  padding: 1em;
+}
+form {
+  padding-bottom: 1em;
+}
+    </style>
+  </head>
+  <body>
+    <h1>HIPC Gates Validation Demo</h1>
+
+    <div class="container-fluid">
+      <!-- Instructions -->
+      <div class="row">
+        <div class="col-md-6">
+          <h2>Cells</h2>
+          <p>
+          Enter a cell type from the <a href="http://obofoundry.org/ontology/cl.html">Cell Ontology</a>
+          (<a href="https://www.ebi.ac.uk/ols/ontologies/cl">search on OLS</a>).
+          </p>
+        </div>
+        <div class="col-md-6">
+          <h2>Gates</h2>
+          <p>
+          Enter a space-separated list of gates.
+          Gate names come from the <a href="https://pir.georgetown.edu/pro/">Protein Ontology</a>
+          (<a href="https://www.ebi.ac.uk/ols/ontologies/pr">search on OLS</a>)
+          or our <a href="https://docs.google.com/spreadsheets/d/1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI/edit?usp=sharing">list of special gates</a>.
+          </p>
+        </div>
+      </div>
+
+      <!-- Forms -->
+      <div class="row">
+        <form>
+          <div class="col-md-6">
+            <div class="form-group">
+              <input type="text" class="form-control" name="cells" value="{{ cells }}"/>
+            </div>
+            <input type="submit" class="btn btn-primary" value="Submit"/>
+            <a href="/" class="btn btn-info" role="button">Reset</a>
+          </div>
+          <div class="col-md-6">
+            <div class="form-group">
+              <input type="text" class="form-control" name="gates" value="{{ gates }}"/>
+            </div>
+            <input type="submit" class="btn btn-primary" value="Submit"/>
+            <a href="/" class="btn btn-info" role="button">Reset</a>
+          </div>
+        </form>
+      </div>
+
+      <!-- Cells -->
+      <div class="row">
+        <div class="col-md-6">
+          <h3>Cell Type</h3>
+          {% if cell.recognized %}
+          <p><a href="{{ cell.iri }}">{{ cell.label }}</a></p>
+          {% endif %}
+        </div>
+        <div class="col-md-6">
+          <h3>Gate Type</h3>
+          <p>
+          {% for result in gate_results %}
+          {% if result.kind_recognized %}
+          <a href="{{ result.kind }}">{{ result.gate }}</a>
+          {% endif %}
+          {% endfor %}
+          </p>
+        </div>
+      </div>
+
+      <!-- Tables -->
+      <div class="row">
+        <div class="col-md-6">
+          <h3>Cell Elements</h3>
+          <table class="table">
+            <tr>
+              <th>Ontology Term</th>
+              <th>Level</th>
+            </tr>
+            {% for result in cell_results %}
+            <tr>
+              <td>
+                {% if result.kind_recognized %}
+                <a href="{{ result.kind }}">{{ result.kind_label }}</a>
+                {% endif %}
+              </td>
+              <td>{{ result.level_name }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+        <div class="col-md-6">
+          <h3>Gate Elements</h3>
+          <table class="table">
+            <tr>
+              <th>Gate</th>
+              <th>Ontology Term</th>
+              <th>Level</th>
+            </tr>
+            {% for result in gate_results %}
+            <tr>
+              <td>{{ result.gate }}</td>
+              <td>
+                {% if result.kind_recognized %}
+                <a href="{{ result.kind }}">{{ result.kind_label }}</a>
+                {% endif %}
+              </td>
+              <td>{{ result.level_name }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      </div>
+
+      <!-- Definitions -->
+      <div class="row">
+        <div class="col-md-6">
+          <h3>Cell Definition</h3>
+          <p>
+          <strong>Equivalent to:</strong>
+          <a href="{{ cell.parent }}">{{ cell.parent_label }}</a>
+          </p>
+          {% for result in cell_results %}
+          <p style="padding-left: 2em">
+          {% if result.kind_recognized and result.level_recognized %}
+          and
+          <a href="{{ result.level }}">{{ result.level_label }}</a>
+          some
+          <a href="{{ result.kind }}">{{ result.kind_label }}</a>
+          {% endif %}
+          </p>
+          {% endfor %}
+        </div>
+        <div class="col-md-6">
+          <h3>Gate Definition</h3>
+          <p>
+          <strong>Equivalent to:</strong>
+          <a href="{{ cell.iri }}">{{ cell.label }}</a>
+          </p>
+          {% for result in gate_results %}
+          <p style="padding-left: 2em">
+          {% if result.kind_recognized and result.level_recognized %}
+          and
+          <a href="{{ result.level }}">{{ result.level_label }}</a>
+          some
+          <a href="{{ result.kind }}">{{ result.kind_label }}</a>
+          {% endif %}
+          </p>
+          {% endfor %}
+        </div>
+      </div>
+
+      <p>See the source code: <a href="https://github.com/jamesaoverton/hipc-gates">https://github.com/jamesaoverton/hipc-gates</a><p>
+
+    </div>
+
+  </body>
+</html>
