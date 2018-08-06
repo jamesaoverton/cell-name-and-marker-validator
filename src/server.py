@@ -107,6 +107,9 @@ def my_app():
     gate['gate'] = gate_string
     gate['kind_name'] = kind_name
     gate['level_name'] = level_names[level_name]
+    for cell_result in cell_results:
+      if kind == cell_result['kind']:
+        gate['conflict'] = True
     gate_results.append(gate)
 
   return render_template('/index.html',

@@ -13,36 +13,26 @@ body {
 form {
   padding-bottom: 1em;
 }
+.conflict {
+  font-weight: bold;
+  color: red;
+}
     </style>
   </head>
   <body>
     <h1>HIPC Gates Validation Demo</h1>
 
     <div class="container-fluid">
-      <!-- Instructions -->
-      <div class="row">
-        <div class="col-md-6">
-          <h2>Cells</h2>
-          <p>
-          Enter a cell type from the <a href="http://obofoundry.org/ontology/cl.html">Cell Ontology</a>
-          (<a href="https://www.ebi.ac.uk/ols/ontologies/cl">search on OLS</a>).
-          </p>
-        </div>
-        <div class="col-md-6">
-          <h2>Gates</h2>
-          <p>
-          Enter a space-separated list of gates.
-          Gate names come from the <a href="https://pir.georgetown.edu/pro/">Protein Ontology</a>
-          (<a href="https://www.ebi.ac.uk/ols/ontologies/pr">search on OLS</a>)
-          or our <a href="https://docs.google.com/spreadsheets/d/1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI/edit?usp=sharing">list of special gates</a>.
-          </p>
-        </div>
-      </div>
 
       <!-- Forms -->
       <div class="row">
         <form>
           <div class="col-md-6">
+            <h2>Cells</h2>
+            <p>
+            Enter a cell type from the <a href="http://obofoundry.org/ontology/cl.html">Cell Ontology</a>
+            (<a href="https://www.ebi.ac.uk/ols/ontologies/cl">search on OLS</a>).
+            </p>
             <div class="form-group">
               <input type="text" class="form-control" name="cells" value="{{ cells }}"/>
             </div>
@@ -50,6 +40,13 @@ form {
             <a href="/" class="btn btn-info" role="button">Reset</a>
           </div>
           <div class="col-md-6">
+            <h2>Gates</h2>
+            <p>
+            Enter a space-separated list of gates.
+            Gate names come from the <a href="https://pir.georgetown.edu/pro/">Protein Ontology</a>
+            (<a href="https://www.ebi.ac.uk/ols/ontologies/pr">search on OLS</a>)
+            or our <a href="https://docs.google.com/spreadsheets/d/1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI/edit?usp=sharing">list of special gates</a>.
+            </p>
             <div class="form-group">
               <input type="text" class="form-control" name="gates" value="{{ gates }}"/>
             </div>
@@ -109,7 +106,7 @@ form {
               <th>Level</th>
             </tr>
             {% for result in gate_results %}
-            <tr>
+            <tr class="{% if result.conflict %}conflict{% endif %}">
               <td>{{ result.gate }}</td>
               <td>
                 {% if result.kind_recognized %}
@@ -149,7 +146,7 @@ form {
           <a href="{{ cell.iri }}">{{ cell.label }}</a>
           </p>
           {% for result in gate_results %}
-          <p style="padding-left: 2em">
+          <p style="padding-left: 2em" class="{% if result.conflict %}conflict{% endif %}">
           {% if result.kind_recognized and result.level_recognized %}
           and
           <a href="{{ result.level }}">{{ result.level_label }}</a>
