@@ -61,7 +61,15 @@ build/excluded-experiments.tsv: | build
 
 # Download pr.owl, about 1GB!
 build/pr.owl: | build
-	curl -L -o $@ "http://purl.obolibrary.org/obo/pr.owl"
+	curl -k -L -o $@ "http://purl.obolibrary.org/obo/pr.owl"
+
+# Extract a table of rdfs:label for (proper) PR terms.
+build/pr-labels.tsv: build/pr.owl | build
+	rapper $< \
+	| grep '^<http://purl.obolibrary.org/obo/PR_0' \
+	| grep '> <http://www.w3.org/2000/01/rdf-schema#label> "' \
+	| sed 's/^<\(.*\)> <.*> "\(.*\)".*$$/\1	\2/' \
+	> $@
 
 # Extract a table of oio:hasExactSynonyms for (proper) PR terms.
 # We want the "PRO-short-label" but unfortunately that's in an OWL annotation property.
@@ -70,7 +78,6 @@ build/pr-exact-synonyms.tsv: build/pr.owl | build
 	| grep '^<http://purl.obolibrary.org/obo/PR_0' \
 	| grep '> <http://www.geneontology.org/formats/oboInOwl#hasExactSynonym> "' \
 	| sed 's/^<\(.*\)> <.*> "\(.*\)".*$$/\1	\2/' \
-	| sed 's!^http://purl.obolibrary.org/obo/PR_!PR:!' \
 	> $@
 
 
