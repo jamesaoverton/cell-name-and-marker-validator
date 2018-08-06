@@ -52,8 +52,3 @@ def main():
 
 if __name__ == "__main__":
   main()
-
-def test_report():
-  assert report({'foo': 'PR:0'}, 'foo+ : bar+ foo- bat foo') == [
-      'PR:0+', ':', '[bar]+', 'PR:0-', '[bat]', 'PR:0'
-  ]
