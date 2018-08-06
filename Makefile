@@ -81,6 +81,15 @@ build/pr-exact-synonyms.tsv: build/pr.owl | build
 	> $@
 
 
+### Cell Ontology
+#
+# We use the Cell Ontology for its logical definitions.
+
+# Download cl.owl, about 6MB, no imports.
+build/cl.owl: | build
+	curl -k -L -o $@ "http://purl.obolibrary.org/obo/cl.owl"
+
+
 ### Processing
 #
 # Various Python scripts are used to process the `source.tsv` file.
