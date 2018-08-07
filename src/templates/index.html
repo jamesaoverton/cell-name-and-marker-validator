@@ -103,7 +103,7 @@ form {
               <th>Level</th>
             </tr>
             {% for result in cell_results %}
-            <tr>
+            <tr class="{% if result.conflict %}conflict{% endif %}">
               <td>
                 {% if result.kind_recognized %}
                 <a href="{{ result.kind }}">{{ result.kind_label }}</a>
@@ -151,7 +151,7 @@ form {
           <a href="{{ cell.parent }}">{{ cell.parent_label }}</a>
           </p>
           {% for result in cell_results %}
-          <p style="padding-left: 2em">
+          <p style="padding-left: 2em" class="{% if result.conflict %}conflict{% endif %}">
           {% if result.kind_recognized and result.level_recognized %}
           and
           <a href="{{ result.level }}">{{ result.level_label }}</a>

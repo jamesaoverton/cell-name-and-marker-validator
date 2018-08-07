@@ -134,6 +134,7 @@ def my_app():
     for cell_result in cell_results:
       if kind == cell_result['kind']:
         gate['conflict'] = True
+        cell_result['conflict'] = True
         cell['conflicts'] = True
     gate_results.append(gate)
 
