@@ -133,7 +133,7 @@ def my_app():
     gate['level_name'] = level_names[level_name]
 
     for cell_result in cell_results:
-      if kind == cell_result['kind']:
+      if kind == cell_result['kind'] and level != cell_result['level']:
         gate['conflict'] = True
         cell_result['conflict'] = True
         cell['conflicts'] = True
