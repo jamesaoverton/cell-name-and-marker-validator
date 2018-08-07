@@ -2,7 +2,7 @@
 #
 # Use [Flask](http://flask.pocoo.org) to serve a validation page.
 
-import csv, re
+import copy, csv, re
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from flask import Flask, request, render_template, redirect, url_for
@@ -72,6 +72,7 @@ def my_app():
 
   cell_results = []
   gate_results = []
+  conflicts = []
 
   # Submit a: label, synonym, ID, or IRI
   cell_iri = None
@@ -136,6 +137,10 @@ def my_app():
         gate['conflict'] = True
         cell_result['conflict'] = True
         cell['conflicts'] = True
+        conflict = copy.deepcopy(gate)
+        conflict['cell_level'] = cell_result['level']
+        conflict['cell_level_name'] = cell_result['level_name']
+        conflicts.append(conflict)
     gate_results.append(gate)
 
   return render_template('/index.html',
@@ -144,7 +149,8 @@ def my_app():
       cell=cell,
       cell_results=cell_results,
       gate_results=gate_results,
-      gate_errors=gate_errors)
+      gate_errors=gate_errors,
+      conflicts=conflicts)
 
 if __name__ == '__main__':
   with open('build/value-scale.tsv') as f:

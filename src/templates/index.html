@@ -141,6 +141,38 @@ form {
         </div>
       </div>
 
+      <!-- Conflicts -->
+      <div class="row">
+        <div class="col-md-12">
+          {% if cell.conflicts %}
+          <h3>Conflicts</h3>
+          <p>These gates conflict with the cell definition.</p>
+          <table class="table">
+            <tr>
+              <th>Gate</th>
+              <th>Ontology Term</th>
+              <th>Cell Level</th>
+              <th>Gate Level</th>
+            </tr>
+            {% for result in conflicts %}
+            <tr class="conflict">
+              <td>{{ result.gate }}</td>
+              <td>
+                {% if result.kind_recognized %}
+                <a href="{{ result.kind }}">{{ result.kind_label }}</a>
+                {% else %}
+                <strong class="error">Unrecognized gate</strong>
+                {% endif %}
+              </td>
+              <td>{{ result.cell_level_name }}</td>
+              <td>{{ result.level_name }}</td>
+            </tr>
+            {% endfor %}
+          </table>
+          {% endif %}
+        </div>
+      </div>
+
       <!-- Definitions -->
       <div class="row">
         <div class="col-md-6">
