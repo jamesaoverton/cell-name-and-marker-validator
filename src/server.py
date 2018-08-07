@@ -4,9 +4,12 @@
 
 import csv, re
 import xml.etree.ElementTree as ET
+from collections import OrderedDict
 from flask import Flask, request, render_template, redirect, url_for
 app = Flask(__name__)
 
+symbols = {}
+suffixes = OrderedDict()
 synonym_iris = {}
 
 iri_labels = {
@@ -81,7 +84,10 @@ def my_app():
     if iri in iri_labels:
       cell_iri = iri
 
-  cell = {'recognized': False}
+  cell = {
+    'recognized': False,
+    'conflicts': False
+  }
   if cell_iri in iri_gates:
     cell['recognized'] = True
     cell['iri'] = cell_iri
@@ -97,19 +103,38 @@ def my_app():
         gate['level_name'] = level_names[iri_levels[gate['level']]]
       cell_results.append(gate)
 
-  gate_strings = gates_field.split()
+  gate_strings = re.findall('\w+[\+\~\-]*', gates_field)
+  gate_errors = False
   for gate_string in gate_strings:
+    for suffix in suffixes.keys():
+      if gate_string.endswith(suffix):
+        gate_string = re.sub('\s*' + re.escape(suffix) + '$', symbols[suffixes[suffix]], gate_string)
+        continue
+
     kind_name = gate_string.rstrip('+-~')
     level_name = re.search('[\-\+\~]*$', gate_string).group(0)
-    kind = synonym_iris[kind_name]
-    level = level_iris[level_name]
-    gate = decorate_gate(kind, level)
+    kind = None
+    if kind_name in synonym_iris:
+      kind = synonym_iris[kind_name]
+    level = None
+    if level_name == '':
+      level_name = '+'
+    if level_name in level_iris:
+      level = level_iris[level_name]
+    gate = {}
+
+    if kind:
+      gate = decorate_gate(kind, level)
+    else:
+      gate_errors = True
     gate['gate'] = gate_string
     gate['kind_name'] = kind_name
     gate['level_name'] = level_names[level_name]
+
     for cell_result in cell_results:
       if kind == cell_result['kind']:
         gate['conflict'] = True
+        cell['conflicts'] = True
     gate_results.append(gate)
 
   return render_template('/index.html',
@@ -117,9 +142,19 @@ def my_app():
       gates=gates_field,
       cell=cell,
       cell_results=cell_results,
-      gate_results=gate_results)
+      gate_results=gate_results,
+      gate_errors=gate_errors)
 
 if __name__ == '__main__':
+  with open('build/value-scale.tsv') as f:
+    rows = csv.DictReader(f, delimiter='\t')
+    for row in rows:
+      symbols[row['Name']] = row['Symbol']
+      suffixes[row['Name']] = row['Name']
+      for synonym in row['Synonyms'].split(','):
+        synonym = synonym.strip()
+        if synonym != '':
+          suffixes[synonym] = row['Name']
 
   # Read special gates
   with open('build/special-gates.tsv') as f:

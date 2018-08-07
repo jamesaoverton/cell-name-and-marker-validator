@@ -13,7 +13,7 @@ body {
 form {
   padding-bottom: 1em;
 }
-.conflict {
+.conflict, .error {
   font-weight: bold;
   color: red;
 }
@@ -42,8 +42,8 @@ form {
           <div class="col-md-6">
             <h2>Gates</h2>
             <p>
-            Enter a space-separated list of gates.
-            Gate names come from the <a href="https://pir.georgetown.edu/pro/">Protein Ontology</a>
+            Enter a list of gates
+            from the <a href="https://pir.georgetown.edu/pro/">Protein Ontology</a>
             (<a href="https://www.ebi.ac.uk/ols/ontologies/pr">search on OLS</a>)
             or our <a href="https://docs.google.com/spreadsheets/d/1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI/edit?usp=sharing">list of special gates</a>.
             </p>
@@ -62,23 +62,40 @@ form {
           <h3>Cell Type</h3>
           {% if cell.recognized %}
           <p><a href="{{ cell.iri }}">{{ cell.label }}</a></p>
+          {% else %}
+          <p><strong class="error">ERROR: Unrecognized cell type.</strong></p>
+          <p>
+          Please enter a cell type from the <a href="http://obofoundry.org/ontology/cl.html">Cell Ontology</a>
+          (<a href="https://www.ebi.ac.uk/ols/ontologies/cl">search on OLS</a>).
+          </p>
           {% endif %}
         </div>
         <div class="col-md-6">
           <h3>Gate Type</h3>
-          <p>
-          {% for result in gate_results %}
-          {% if result.kind_recognized %}
-          <a href="{{ result.kind }}">{{ result.gate }}</a>
+          {% if gate_errors %}
+            <p><strong class="error">ERROR: Unrecognized gate type.</strong></p>
+            <p>
+              Please enter a list of gates
+              from the <a href="https://pir.georgetown.edu/pro/">Protein Ontology</a>
+              (<a href="https://www.ebi.ac.uk/ols/ontologies/pr">search on OLS</a>)
+              or our <a href="https://docs.google.com/spreadsheets/d/1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI/edit?usp=sharing">list of special gates</a>.
+            </p>
+          {% else %}
+            <p>
+            {% for result in gate_results %}
+            {% if result.kind_recognized %}
+            <a href="{{ result.kind }}">{{ result.gate }}</a>
+            {% endif %}
+            {% endfor %}
+            </p>
           {% endif %}
-          {% endfor %}
-          </p>
         </div>
       </div>
 
       <!-- Tables -->
       <div class="row">
         <div class="col-md-6">
+          {% if cell.recognized %}
           <h3>Cell Elements</h3>
           <table class="table">
             <tr>
@@ -96,7 +113,9 @@ form {
             </tr>
             {% endfor %}
           </table>
+          {% endif %}
         </div>
+
         <div class="col-md-6">
           <h3>Gate Elements</h3>
           <table class="table">
@@ -111,6 +130,8 @@ form {
               <td>
                 {% if result.kind_recognized %}
                 <a href="{{ result.kind }}">{{ result.kind_label }}</a>
+                {% else %}
+                <strong class="error">Unrecognized gate</strong>
                 {% endif %}
               </td>
               <td>{{ result.level_name }}</td>
@@ -123,6 +144,7 @@ form {
       <!-- Definitions -->
       <div class="row">
         <div class="col-md-6">
+          {% if cell.recognized %}
           <h3>Cell Definition</h3>
           <p>
           <strong>Equivalent to:</strong>
@@ -138,8 +160,11 @@ form {
           {% endif %}
           </p>
           {% endfor %}
+          {% endif %}
         </div>
+
         <div class="col-md-6">
+          {% if cell.recognized and not gate_errors %}
           <h3>Gate Definition</h3>
           <p>
           <strong>Equivalent to:</strong>
@@ -152,9 +177,10 @@ form {
           <a href="{{ result.level }}">{{ result.level_label }}</a>
           some
           <a href="{{ result.kind }}">{{ result.kind_label }}</a>
-          {% endif %}
           </p>
+          {% endif %}
           {% endfor %}
+          {% endif %}
         </div>
       </div>
 
