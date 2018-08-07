@@ -179,11 +179,10 @@ form {
           {% if cell.recognized %}
           <h3>Cell Definition</h3>
           <p>
-          <strong>Equivalent to:</strong>
           <a href="{{ cell.parent }}">{{ cell.parent_label }}</a>
           </p>
           {% for result in cell_results %}
-          <p style="padding-left: 2em" class="{% if result.conflict %}conflict{% endif %}">
+          <p class="{% if result.conflict %}conflict{% endif %}">
           {% if result.kind_recognized and result.level_recognized %}
           and
           <a href="{{ result.level }}">{{ result.level_label }}</a>
@@ -199,11 +198,10 @@ form {
           {% if cell.recognized and not gate_errors %}
           <h3>Gate Definition</h3>
           <p>
-          <strong>Equivalent to:</strong>
           <a href="{{ cell.iri }}">{{ cell.label }}</a>
           </p>
           {% for result in gate_results %}
-          <p style="padding-left: 2em" class="{% if result.conflict %}conflict{% endif %}">
+          <p class="{% if result.conflict %}conflict{% endif %}">
           {% if result.kind_recognized and result.level_recognized %}
           and
           <a href="{{ result.level }}">{{ result.level_label }}</a>
