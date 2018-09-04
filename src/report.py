@@ -40,17 +40,18 @@ def main():
     w.writerow(list(next(rows).keys()) + ['POPULATION_DEFNITION_TYPES', 'MATCHED_GATES', 'TOTAL_GATES'])
     for row in rows:
       normalized = row['POPULATION_DEFNITION_NORMALIZED']
-      ids = report(gate_types, normalized)
-      matched_gates = 0
-      total_gates = 0
-      for i in ids:
-        total_gates += 1
-        if not i.startswith('['):
-          matched_gates += 1
-      row['POPULATION_DEFNITION_TYPES'] = ' '.join(ids)
-      row['MATCHED_GATES'] = matched_gates
-      row['TOTAL_GATES'] = total_gates
-      w.writerow(row.values())
+      if normalized:
+        ids = report(gate_types, normalized)
+        matched_gates = 0
+        total_gates = 0
+        for i in ids:
+          total_gates += 1
+          if not i.startswith('['):
+            matched_gates += 1
+        row['POPULATION_DEFNITION_TYPES'] = ' '.join(ids)
+        row['MATCHED_GATES'] = matched_gates
+        row['TOTAL_GATES'] = total_gates
+        w.writerow(row.values())
 
 if __name__ == "__main__":
   main()
