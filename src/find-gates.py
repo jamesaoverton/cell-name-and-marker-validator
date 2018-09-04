@@ -23,10 +23,11 @@ def main():
   rows = csv.DictReader(args.normalized, delimiter='\t')
   for row in rows:
     normalized = row['POPULATION_DEFNITION_NORMALIZED']
-    gates = re.split('\s+', normalized)
-    for gate in gates:
-      gate = gate.rstrip('-+~')
-      all_gates[gate] += 1
+    if normalized:
+      gates = re.split('\s+', normalized)
+      for gate in gates:
+        gate = gate.rstrip('-+~')
+        all_gates[gate] += 1
 
   rows = csv.reader(args.recognized, delimiter='\t')
   with open(args.gates, 'w') as output:

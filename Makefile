@@ -103,14 +103,8 @@ build/normalized.tsv: src/normalize.py build/excluded-experiments.tsv build/valu
 build/gate-mappings.tsv: build/special-gates.tsv build/pr-exact-synonyms.tsv
 	cat $^ | cut -f 1-2 > $@
 
-# Normalize the cell population strings across studies
-build/mapped.tsv: src/map.py build/gate-mappings.tsv build/value-scale.tsv build/normalized.tsv | build
-	$^ $@
-
-
-
 # Generate a list of all gate labels that are used
-build/gates.tsv: src/find-gates.py build/known-gates.tsv build/normalized.tsv
+build/gates.tsv: src/find-gates.py build/gate-mappings.tsv build/normalized.tsv
 	$^ $@
 
 # Map gate labels to IDs and report results
