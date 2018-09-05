@@ -5,6 +5,7 @@ from collections import OrderedDict
 
 
 def normalize(project, symbols, suffixes, reported):
+  # Ignore everything to the left of the first colon on a given line.
   if ': ' in reported:
     reported = re.sub('^.*:\s+', '', reported)
 
@@ -119,14 +120,16 @@ def main():
   rows = csv.DictReader(args.source, delimiter='\t')
   with open(args.output, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
-    w.writerow(list(next(rows).keys()) + ['POPULATION_DEFNITION_NORMALIZED'])
+    output_fieldnames = rows.fieldnames + ['POPULATION_DEFNITION_NORMALIZED']
+    w.writerow(output_fieldnames)
     for row in rows:
       if not row['EXPERIMENT_ACCESSION'] in excluded_experiments:
         reported = row['POPULATION_DEFNITION_REPORTED']
         gates = normalize(row['NAME'], symbols, suffixes, reported)
-        if gates:
-          row['POPULATION_DEFNITION_NORMALIZED'] = ' '.join(gates)
-      w.writerow(row.values())
+        row['POPULATION_DEFNITION_NORMALIZED'] = ' '.join(gates) if gates else ''
+        # Explicitly reference output_fieldnames here to make sure that the order in which the data
+        # is written to the file matches the header order.
+        w.writerow([row[fn] for fn in output_fieldnames])
 
 
 if __name__ == "__main__":
