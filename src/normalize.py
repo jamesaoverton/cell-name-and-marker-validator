@@ -107,6 +107,8 @@ def tokenize(projname, symbols, suffixes, reported):
 
   return tokenized
 
+def normalize(gates):
+  pass
 
 def main():
   # Define command-line parameters
@@ -148,20 +150,23 @@ def main():
       if synonym != '':
         suffixes[synonym] = row['Name']
 
-  # Load the contents of the source file. Then for each row determine the normalised population
-  # definition based on the definition reported in the source file and our scaling indicators.
-  # Then copy the row into a new file with an addition column containing the normalised definition.
-  # Ignore any rows describing excluded experiments.
+  # Load the contents of the source file. Then for each row determine the tokenised and normalised
+  # population definition based on the definition reported in the source file and our scaling
+  # indicators. Then copy the row into a new file with additional columns containing the tokenised
+  # and normalised definitions. Ignore any rows describing excluded experiments.
   rows = csv.DictReader(args.source, delimiter='\t')
   with open(args.output, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
-    output_fieldnames = rows.fieldnames + ['POPULATION_DEFNITION_TOKENIZED']
+    output_fieldnames = (
+      rows.fieldnames + ['Gating tokenized'] + ['Gating mapped to ontologies'])
     w.writerow(output_fieldnames)
     for row in rows:
       if not row['EXPERIMENT_ACCESSION'] in excluded_experiments:
         reported = row['POPULATION_DEFNITION_REPORTED']
         gates = tokenize(row['NAME'], symbols, suffixes, reported)
-        row['POPULATION_DEFNITION_TOKENIZED'] = ' '.join(gates) if gates else ''
+        row['Gating tokenized'] = '; '.join(gates) if gates else ''
+        ontologies = normalize(gates)
+        row['Gating mapped to ontologies'] = ' '.join(ontologies) if ontologies else ''
         # Explicitly reference output_fieldnames here to make sure that the order in which the data
         # is written to the file matches the header order.
         w.writerow([row[fn] for fn in output_fieldnames])
