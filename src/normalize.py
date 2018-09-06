@@ -4,67 +4,91 @@ import argparse, csv, re
 from collections import OrderedDict
 
 
-def normalize(project, symbols, suffixes, reported):
+def normalize(projname, symbols, suffixes, reported):
+  def any_in_projname(kwds):
+    # Inner function to determine whether the given project name contains any of the given keywords
+    return any([kwd in projname for kwd in kwds])
+
   # Ignore everything to the left of the first colon on a given line.
   if ': ' in reported:
     reported = re.sub('^.*:\s+', '', reported)
 
+  # Every project has different types of gates and methods for delimiting gates, so parsing the
+  # reported gates from the source file will in general be different for each project.
   gates = []
-  if 'LaJolla' in project:
+  if any_in_projname(['LaJolla', 'ARA06', 'Center for Human Immunology', 'Wistar']):
+    # No delimiters between gates
     gates = re.findall('\w+[\-\+]*', reported)
-  elif 'Emory' in project:
+  elif any_in_projname(['IPIRC', 'Watson', 'Ltest', 'Seattle Biomed']):
+    # Gates are separated by forward slashes
+    gates = re.split('\/', reported)
+  elif 'Emory' in projname:
+    # Gates are separated by commas followed by whitespace
     gates = re.split(',\s+', reported)
-  elif 'IPIRC' in project:
-    gates = re.split('\/', reported)
-  elif 'Watson' in project:
-    gates = re.split('\/', reported)
-  elif 'Ltest' in project:
-    gates = re.split('\/', reported)
-  elif 'VRC' in project:
+  elif 'VRC' in projname:
+    # Gates are separated by a capitalised 'AND', and surrounded by whitespace
     gates = re.split('\s+AND\s+', reported)
-  elif 'Ertl' in project:
+  elif 'Ertl' in projname:
+    # Gates are separated by a lowercase 'and', and surrounded by whitespace
     gates = re.split('\s+and\s+', reported)
-  elif 'Stanford' in project:
+  elif 'Stanford' in projname:
+    # First delimit any non-delimited gates with a forward slash. Then all gates will be delimited
+    # by either a forward slash or a comma, followed by whitespace.
     reported = re.sub(r'([\-\+])(CD\d+|CX\w+\d+|CCR\d)', r'\1/\2', reported)
     gates = re.split('\/|,\s+', reported)
-  elif 'Baylor' in project:
+  elif 'Baylor' in projname:
+    # First eliminate any duplicate commas. Then separate any occurrences of 'granulocyte' that
+    # are preceded by a space (since these are gates which must be noted). Then delimit any
+    # non-delimited gates using a forward slash. At the end of all of this, gates will be delimited
+    # by either a forward slash or a comma, possibly followed by whitespace.
     reported = re.sub(',,+', ',', reported)
     reported = re.sub(' granulocyte', ', granulocyte', reported)
     reported = re.sub(r'([\-\+])CD(\d)', r'\1/CD\2', reported)
     gates = re.split('\/|,\s*', reported)
-  elif 'Rochester' in project:
+  elif 'Rochester' in projname:
+    # Gates are delimited either by: (a) forward slashes, (b) semicolons possibly followed by
+    # whitespace.
     gates = re.split(';+\s*|\/', reported)
-  elif 'Mayo' in project:
+  elif 'Mayo' in projname:
+    # If any 'CD' gates are not delimited by a forward slash, so delimit them; all gates should be
+    # delimited by forward slashes.
     reported = re.sub(r' CD(\d)', r' /CD\1', reported)
     gates = re.split('\/', reported)
-  elif 'ARA06' in project:
-    gates = re.findall('\w+[\-\+]*', reported)
-  elif 'Center for Human Immunology' in project:
-    gates = re.findall('\w+[\-\+]*', reported)
-  elif 'Seattle Biomed' in project:
-    gates = re.split('\/', reported)
-  elif 'Improving Kidney' in project:
+  elif 'Improving Kidney' in projname:
+    # Delimit non-delimited gates with a forward slash; all gates should be delimited by
+    # forward slashes
     reported = re.sub(r'([\-\+])CD(\d)', r'\1/CD\2', reported)
     gates = re.split('\/', reported)
-  elif 'New York Influenza' in project:
+  elif 'New York Influenza' in projname:
+    # Make it such that any occurrences of 'high' is followed by a space, then delimit non-delimited
+    # gates with a forward slash; all gates should then be delimited by either a forward slash or a
+    # comma.
     reported = re.sub('high', 'high ', reported)
     reported = re.sub(r'([\-\+ ])(CD\d+|CXCR\d|BCL\d|IF\w+|PD\d+|IL\d+|TNFa)', r'\1/\2', reported)
     gates = re.split('\/|,', reported)
-  elif 'Modeling Viral' in project:
+  elif 'Modeling Viral' in projname:
+    # Gates are separated either by (a) 'AND' surrounded by whitespace, (b) '_AND_', (c) '+'
+    # surrounded by whitespace.
     gates = re.split('\s+AND\s+|_AND_|\s+\+\s+', reported)
-  elif 'Immunobiology of Aging' in project:
+  elif 'Immunobiology of Aging' in projname:
+    # First delimit non-delimited gates with a forward slash, then all gates will be delimited by
+    # forward slashes.
     reported = re.sub(r'([\-\+])(CD\d+|Ig\w+)', r'\1/\2', reported)
     gates = re.split('\/', reported)
-  elif 'Flow Cytometry Analysis' in project:
+  elif 'Flow Cytometry Analysis' in projname:
+    # First delimit non-delimited gates with a forward slash, then all gates will be delimited by
+    # forward slashes.
     reported = re.sub(r'(\+|\-)(CD\d+|Ig\w+|IL\d+|IF\w+|TNF\w+|Per\w+)', r'\1/\2', reported)
     gates = re.split('\/', reported)
-  elif 'Wistar' in project:
-    gates = re.findall('\w+[\-\+]*', reported)
-  elif 'ITN019AD' in project:
+  elif 'ITN019AD' in projname:
+    # Remove any occurrences of "AND R<some number>" which follow a gate. Then replace any
+    # occurrences of the word 'AND' with a space. Then all gates will be delimited by spaces.
     reported = re.sub('(\s+AND)?\s+R\d+.*$', '', reported)
     reported = re.sub('\s+AND\s+', ' ', reported)
     gates = re.split('\s+', reported)
   else:
+    # By default, any of the following are valid delimiters: a forward slash, a comma possibly
+    # followed by some whitespace, 'AND' or 'and' surrounded by whitespace.
     gates = re.split('\/|,\s*|\s+AND\s+|\s+and\s+', reported)
 
   normalized = []
@@ -85,6 +109,7 @@ def normalize(project, symbols, suffixes, reported):
 
 
 def main():
+  # Define command-line parameters
   parser = argparse.ArgumentParser(
       description='Normalize cell population descriptions')
   parser.add_argument('excluded',
@@ -99,13 +124,19 @@ def main():
   parser.add_argument('output',
       type=str,
       help='the output TSV file')
+
+  # Parse command-line parameters
   args = parser.parse_args()
 
+  # Load the contents of the file given by the command-line parameter args.excluded
+  # These are the experiments we should ignore when reading from the source file
   excluded_experiments = set()
   rows = csv.DictReader(args.excluded, delimiter='\t')
   for row in rows:
     excluded_experiments.add(row['Experiment Accession'])
 
+  # Load the contents of the file given by the command-line parameter args.scale.
+  # These define suffix codes for various scaling indicators, which must be noted during parsing
   symbols = {}
   suffixes = OrderedDict()
   rows = csv.DictReader(args.scale, delimiter='\t')
@@ -117,6 +148,10 @@ def main():
       if synonym != '':
         suffixes[synonym] = row['Name']
 
+  # Load the contents of the source file. Then for each row determine the normalised population
+  # definition based on the definition reported in the source file and our scaling indicators.
+  # Then copy the row into a new file with an addition column containing the normalised definition.
+  # Ignore any rows describing excluded experiments.
   rows = csv.DictReader(args.source, delimiter='\t')
   with open(args.output, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
