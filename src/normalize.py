@@ -4,7 +4,7 @@ import argparse, csv, re
 from collections import OrderedDict
 
 
-def normalize(projname, symbols, suffixes, reported):
+def tokenize(projname, symbols, suffixes, reported):
   def any_in_projname(kwds):
     # Inner function to determine whether the given project name contains any of the given keywords
     return any([kwd in projname for kwd in kwds])
@@ -91,7 +91,7 @@ def normalize(projname, symbols, suffixes, reported):
     # followed by some whitespace, 'AND' or 'and' surrounded by whitespace.
     gates = re.split('\/|,\s*|\s+AND\s+|\s+and\s+', reported)
 
-  normalized = []
+  tokenized = []
   for gate in gates:
     gate = gate.strip()
     gate = re.sub('ý', '-', gate) # Unicode hyphen
@@ -103,9 +103,9 @@ def normalize(projname, symbols, suffixes, reported):
 
     gate = re.sub(' ', '_', gate)
 
-    normalized.append(gate)
+    tokenized.append(gate)
 
-  return normalized
+  return tokenized
 
 
 def main():
@@ -155,13 +155,13 @@ def main():
   rows = csv.DictReader(args.source, delimiter='\t')
   with open(args.output, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
-    output_fieldnames = rows.fieldnames + ['POPULATION_DEFNITION_NORMALIZED']
+    output_fieldnames = rows.fieldnames + ['POPULATION_DEFNITION_TOKENIZED']
     w.writerow(output_fieldnames)
     for row in rows:
       if not row['EXPERIMENT_ACCESSION'] in excluded_experiments:
         reported = row['POPULATION_DEFNITION_REPORTED']
-        gates = normalize(row['NAME'], symbols, suffixes, reported)
-        row['POPULATION_DEFNITION_NORMALIZED'] = ' '.join(gates) if gates else ''
+        gates = tokenize(row['NAME'], symbols, suffixes, reported)
+        row['POPULATION_DEFNITION_TOKENIZED'] = ' '.join(gates) if gates else ''
         # Explicitly reference output_fieldnames here to make sure that the order in which the data
         # is written to the file matches the header order.
         w.writerow([row[fn] for fn in output_fieldnames])
@@ -171,7 +171,7 @@ if __name__ == "__main__":
   main()
 
 
-def test_normalize():
+def test_tokenize():
   symbols = {
     'high': '++',
     'medium': '+~',
@@ -203,73 +203,73 @@ def test_normalize():
   }
   
   reported = 'CD14-CD56-CD3+CD4+CD8-CD45RA+CCR7+'
-  assert normalize('LaJolla', symbols, suffixes, reported) == [
+  assert tokenize('LaJolla', symbols, suffixes, reported) == [
     'CD14-', 'CD56-', 'CD3+', 'CD4+', 'CD8-', 'CD45RA+', 'CCR7+'
   ]
 
   reported = 'CD3-, CD19+, CD20-, CD27hi, CD38hi'
-  assert normalize('Emory', symbols, suffixes, reported) == [
+  assert tokenize('Emory', symbols, suffixes, reported) == [
     'CD3-', 'CD19+', 'CD20-', 'CD27++', 'CD38++'
   ]
 
   reported = 'CD3-/CD19+/CD20lo/CD38hi/CD27hi'
-  assert normalize('IPIRC', symbols, suffixes, reported) == [
+  assert tokenize('IPIRC', symbols, suffixes, reported) == [
     'CD3-', 'CD19+', 'CD20+-', 'CD38++', 'CD27++'
   ]
 
   reported = 'CD21hi/CD24int'
-  assert normalize('Watson', symbols, suffixes, reported) == [
+  assert tokenize('Watson', symbols, suffixes, reported) == [
     'CD21++', 'CD24+~'
   ]
 
   reported = 'Annexin negative'
-  assert normalize('Ltest', symbols, suffixes, reported) == [
+  assert tokenize('Ltest', symbols, suffixes, reported) == [
     'Annexin-'
   ]
 
   reported = 'CD3+ AND CD4+ AND small lymphocyte'
-  assert normalize('VRC', symbols, suffixes, reported) == [
+  assert tokenize('VRC', symbols, suffixes, reported) == [
     'CD3+', 'CD4+', 'small_lymphocyte'
   ]
 
   reported = 'Lymphocytes and CD8+ and NP tet+'
-  assert normalize('Ertl', symbols, suffixes, reported) == [
+  assert tokenize('Ertl', symbols, suffixes, reported) == [
     'Lymphocytes', 'CD8+', 'NP_tet+'
   ]
 
   reported = 'Activated T: viable/singlets/Lymph/CD3+'
-  assert normalize('Stanford', symbols, suffixes, reported) == [
+  assert tokenize('Stanford', symbols, suffixes, reported) == [
     'viable', 'singlets', 'Lymph', 'CD3+'
   ]
 
   ## TODO: Is this right?
   reported = 'CD14-CD33-/CD3-/CD16+CD56+/CD94+'
-  assert normalize('Stanford', symbols, suffixes, reported) == [
+  assert tokenize('Stanford', symbols, suffixes, reported) == [
     'CD14-', 'CD33-', 'CD3-', 'CD16+', 'CD56+', 'CD94+'
   ]
 
   ## TODO: Is this right?
   reported = 'Live cells/CD4 T cells/CD4+ CD45RA-/Uninfected/SSC low'
-  assert normalize('Mayo', symbols, suffixes, reported) == [
+  assert tokenize('Mayo', symbols, suffixes, reported) == [
     'Live_cells', 'CD4_T_cells', 'CD4+', 'CD45RA-', 'Uninfected', 'SSC+-'
   ]
 
   reported = 'B220- live,doublet excluded,CD4+ CD44highCXCR5highPD1high,ICOS+'
-  assert normalize('New York Influenza', symbols, suffixes, reported) == [
+  assert tokenize('New York Influenza', symbols, suffixes, reported) == [
     'B220-_live', 'doublet_excluded', 'CD4+', 'CD44++', 'CXCR5++', 'PD1++', 'ICOS+'
   ]
 
   reported = 'lymphocytes/singlets/live/CD19-CD14-/CD3+/CD8+/CD69+IFNg+IL2+TNFa+'
-  assert normalize('New York Influenza', symbols, suffixes, reported) == [
+  assert tokenize('New York Influenza', symbols, suffixes, reported) == [
     'lymphocytes', 'singlets', 'live', 'CD19-', 'CD14-', 'CD3+', 'CD8+', 'CD69+', 'IFNg+', 'IL2+', 'TNFa+'
   ]
 
   reported = 'Alexa350 (high) + Alexa750 (medium)'
-  assert normalize('Modeling Viral', symbols, suffixes, reported) == [
+  assert tokenize('Modeling Viral', symbols, suffixes, reported) == [
     'Alexa350++', 'Alexa750+~'
   ]
 
   reported = 'TNFa+IFNg-'
-  assert normalize('Flow Cytometry Analysis', symbols, suffixes, reported) == [
+  assert tokenize('Flow Cytometry Analysis', symbols, suffixes, reported) == [
     'TNFa+', 'IFNg-'
   ]
