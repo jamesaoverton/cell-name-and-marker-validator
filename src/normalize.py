@@ -1,12 +1,29 @@
 #!/usr/bin/env python3
 
-import argparse, csv, re
+import argparse
+import csv
+import re
+
 from collections import OrderedDict
 
 
-def tokenize(projname, symbols, suffixes, reported):
+def tokenize(projname, suffixsymbs, suffixsyns, reported):
+  """
+  Converts a string describing gates reported in an experiment into a list of standardised tokens
+  corresponding to those gates, which are determined by referencing the lists of suffix symbols and
+  suffix synonyms passed to the function.
+
+  Parameters:
+       projname: the name of the project that reported the gates
+       reported: a string describing the gates reported in an experiment
+       suffixsyns: OrderedDict mapping suffix synonyms to their standardised suffix name;
+                   e.g. OrderedDict([('high', 'high'), ('hi', 'high'), ('bright', 'high'), etc.])
+       suffixsymbs: dict mapping suffix names to their symbolic suffix representation;
+                    e.g {'medium': '+~', 'negative': '-', etc.}
+  """
+
+  # Inner function to determine whether the given project name contains any of the given keywords:
   def any_in_projname(kwds):
-    # Inner function to determine whether the given project name contains any of the given keywords
     return any([kwd in projname for kwd in kwds])
 
   # Ignore everything to the left of the first colon on a given line.
@@ -17,10 +34,10 @@ def tokenize(projname, symbols, suffixes, reported):
   # reported gates from the source file will in general be different for each project.
   gates = []
   if any_in_projname(['LaJolla', 'ARA06', 'Center for Human Immunology', 'Wistar']):
-    # No delimiters between gates
+    # These projects do not use delimiters between gates
     gates = re.findall('\w+[\-\+]*', reported)
   elif any_in_projname(['IPIRC', 'Watson', 'Ltest', 'Seattle Biomed']):
-    # Gates are separated by forward slashes
+    # For these projects, gates are separated by forward slashes
     gates = re.split('\/', reported)
   elif 'Emory' in projname:
     # Gates are separated by commas followed by whitespace
@@ -94,38 +111,84 @@ def tokenize(projname, symbols, suffixes, reported):
   tokenized = []
   for gate in gates:
     gate = gate.strip()
-    gate = re.sub('ý', '-', gate) # Unicode hyphen
+    gate = re.sub('ý', '-', gate)  # Unicode hyphen
 
-    for suffix in suffixes.keys():
-      if gate.endswith(suffix):
-        gate = re.sub('\s*' + re.escape(suffix) + '$', symbols[suffixes[suffix]], gate)
+    for suffixsyn in suffixsyns.keys():
+      if gate.endswith(suffixsyn):
+        gate = re.sub('\s*' + re.escape(suffixsyn) + '$', suffixsymbs[suffixsyns[suffixsyn]], gate)
         continue
 
     gate = re.sub(' ', '_', gate)
 
-    tokenized.append(gate)
+    # It may sometimes happen that the gate is empty, for example due to a trailing comma in the
+    # reported field. Ignore any such empty gates.
+    if gate:
+      tokenized.append(gate)
 
   return tokenized
 
-def normalize(gates):
-  pass
+
+def normalize(gates, gate_mappings, special_gates, symbols):
+  """
+  Normalise a tokenised list of gates by replacing gate labels with ontology ids
+
+  Parameters:
+      gates: list of strings describing gates
+      gate_mappings: dict containing mappings of gate labels to ontology ids
+      special_gates: additional information regarding a certain number of special gates.
+      symbols: list of suffix symbols
+  """
+
+  # Inner function to split the name of a gate from its suffix symbol.
+  def split_gate(gate):
+    # Reverse sort the suffix symbols by length to make sure we don't match on a substring of
+    # a longer suffix symbol when we are looking for a shorter suffix symbol
+    # (e.g. '+' is a substring of '++') so we need to search for '++' before searching for '+'
+    for symbol in sorted(list(symbols), key=len, reverse=True):
+      if gate.endswith(symbol):
+        return [gate[0:-len(symbol)], symbol]
+    # If we get to here then there isn't a suffix.
+    return [gate, '']
+
+  normalized_gates = []
+  for gate in gates:
+    # First try to find the ontology id in the gate_mappings map. If it isn't there, check to
+    # see if it has a synonym in the map of special gates. If we don't find it there either, then
+    # prefix the gate with a '!'.
+    label, suffixsymb = split_gate(gate)
+    ontology_id = gate_mappings.get(label)
+    if not ontology_id:
+      ontids_from_special = [val['Ontology ID'] for key, val in special_gates.items() if label and (
+        label == key or label in val['Synonyms'].split(', ') or label == val['Toxic Synonym'])]
+      if ontids_from_special and len(ontids_from_special) > 1:
+        # This shouldn't happen unless there are duplicate names in the special gates file
+        print("Warning: {} ontology ids found with label: '{}'"
+              .format(len(ontids_from_special), gate))
+
+      ontology_id = ontids_from_special[0] if ontids_from_special else "!{}".format(label)
+
+    # Replace the long form of an ontology ID (which includes a URL) with its short form: 'PR:<id>'
+    ontology_id = ontology_id.replace('http://purl.obolibrary.org/obo/PR_', 'PR:')
+    normalized_gates.append(ontology_id + suffixsymb)
+
+  return normalized_gates
+
 
 def main():
   # Define command-line parameters
-  parser = argparse.ArgumentParser(
-      description='Normalize cell population descriptions')
-  parser.add_argument('excluded',
-      type=argparse.FileType('r'),
-      help='a TSV file with experiment accessions to be ignored')
-  parser.add_argument('scale',
-      type=argparse.FileType('r'),
-      help='a TSV file with the value scale (e.g. high, low, negative)')
-  parser.add_argument('source',
-      type=argparse.FileType('r'),
-      help='the source data TSV file')
-  parser.add_argument('output',
-      type=str,
-      help='the output TSV file')
+  parser = argparse.ArgumentParser(description='Normalize cell population descriptions')
+  parser.add_argument('excluded', type=argparse.FileType('r'),
+                      help='a TSV file with experiment accessions to be ignored')
+  parser.add_argument('scale', type=argparse.FileType('r'),
+                      help='a TSV file with the value scale (e.g. high, low, negative)')
+  parser.add_argument('mappings', type=argparse.FileType('r'),
+                      help='a TSV file which maps gate labels to ontology ids/keywords')
+  parser.add_argument('special', type=argparse.FileType('r'),
+                      help='a TSV file containing extra information about a subset of gates')
+  parser.add_argument('source', type=argparse.FileType('r'),
+                      help='the source data TSV file')
+  parser.add_argument('output', type=str,
+                      help='the output TSV file')
 
   # Parse command-line parameters
   args = parser.parse_args()
@@ -138,35 +201,55 @@ def main():
     excluded_experiments.add(row['Experiment Accession'])
 
   # Load the contents of the file given by the command-line parameter args.scale.
-  # These define suffix codes for various scaling indicators, which must be noted during parsing
-  symbols = {}
-  suffixes = OrderedDict()
+  # This defines the suffix synonyms and sumbols for various scaling indicators,
+  # which must be noted during parsing
+  suffixsymbs = {}
+  suffixsyns = OrderedDict()
   rows = csv.DictReader(args.scale, delimiter='\t')
   for row in rows:
-    symbols[row['Name']] = row['Symbol']
-    suffixes[row['Name']] = row['Name']
+    suffixsymbs[row['Name']] = row['Symbol']
+    suffixsyns[row['Name']] = row['Name']
     for synonym in row['Synonyms'].split(','):
       synonym = synonym.strip()
       if synonym != '':
-        suffixes[synonym] = row['Name']
+        suffixsyns[synonym] = row['Name']
 
-  # Load the contents of the source file. Then for each row determine the tokenised and normalised
-  # population definition based on the definition reported in the source file and our scaling
-  # indicators. Then copy the row into a new file with additional columns containing the tokenised
-  # and normalised definitions. Ignore any rows describing excluded experiments.
+  # Load the contents of the file given by the command-line parameter args.mappings.
+  # This file associates gate laels with the ontology ids / keywords with which we populate the
+  # 'Gating mapped to ontologies' column of the output file.
+  rows = csv.DictReader(args.mappings, delimiter='\t')
+  gate_mappings = {}
+  for row in rows:
+    gate_mappings[row['Label']] = row['Ontology ID']
+
+  # Load the contents of the file given by the command-line parameter args.special.
+  # This file (similary to the args.mapping file) associates certain gate labels with ontology ids
+  # but also contains additional information regarding these gates.
+  rows = csv.DictReader(args.special, delimiter='\t')
+  special_gates = {}
+  for row in rows:
+    special_gates[row['Label']] = {
+      'Ontology ID': row['Ontology ID'],
+      'Synonyms': row['Synonyms'],
+      'Toxic Synonym': row['toxic synonym']}
+
+  # Finally, load the contents of the source file. For each row determine the tokenised and
+  # normalised population definition based on the definition reported in the source file and our
+  # scaling indicators. Then copy the row into a new file with additional columns containing the
+  # tokenised and normalised definitions. Ignore any rows describing excluded experiments.
   rows = csv.DictReader(args.source, delimiter='\t')
   with open(args.output, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
-    output_fieldnames = (
-      rows.fieldnames + ['Gating tokenized'] + ['Gating mapped to ontologies'])
+    output_fieldnames = rows.fieldnames + ['Gating tokenized'] + ['Gating mapped to ontologies']
     w.writerow(output_fieldnames)
     for row in rows:
       if not row['EXPERIMENT_ACCESSION'] in excluded_experiments:
-        reported = row['POPULATION_DEFNITION_REPORTED']
-        gates = tokenize(row['NAME'], symbols, suffixes, reported)
-        row['Gating tokenized'] = '; '.join(gates) if gates else ''
-        ontologies = normalize(gates)
-        row['Gating mapped to ontologies'] = ' '.join(ontologies) if ontologies else ''
+        # Remove any surrounding quotation marks
+        reported = row['POPULATION_DEFNITION_REPORTED'].strip('"').strip("'")
+        gates = tokenize(row['NAME'], suffixsymbs, suffixsyns, reported)
+        row['Gating tokenized'] = '; '.join(gates)
+        ontologies = normalize(gates, gate_mappings, special_gates, suffixsymbs.values())
+        row['Gating mapped to ontologies'] = '; '.join(ontologies)
         # Explicitly reference output_fieldnames here to make sure that the order in which the data
         # is written to the file matches the header order.
         w.writerow([row[fn] for fn in output_fieldnames])
@@ -177,14 +260,14 @@ if __name__ == "__main__":
 
 
 def test_tokenize():
-  symbols = {
+  suffixsymbs = {
     'high': '++',
     'medium': '+~',
     'low': '+-',
     'positive': '+',
     'negative': '-'
   }
-  suffixes = {
+  suffixsyns = {
     'high': 'high',
     'hi': 'high',
     'bright': 'high',
@@ -206,75 +289,76 @@ def test_tokenize():
     'positive': 'positive',
     'negative': 'negative'
   }
-  
+
   reported = 'CD14-CD56-CD3+CD4+CD8-CD45RA+CCR7+'
-  assert tokenize('LaJolla', symbols, suffixes, reported) == [
+  assert tokenize('LaJolla', suffixsymbs, suffixsyns, reported) == [
     'CD14-', 'CD56-', 'CD3+', 'CD4+', 'CD8-', 'CD45RA+', 'CCR7+'
   ]
 
   reported = 'CD3-, CD19+, CD20-, CD27hi, CD38hi'
-  assert tokenize('Emory', symbols, suffixes, reported) == [
+  assert tokenize('Emory', suffixsymbs, suffixsyns, reported) == [
     'CD3-', 'CD19+', 'CD20-', 'CD27++', 'CD38++'
   ]
 
   reported = 'CD3-/CD19+/CD20lo/CD38hi/CD27hi'
-  assert tokenize('IPIRC', symbols, suffixes, reported) == [
+  assert tokenize('IPIRC', suffixsymbs, suffixsyns, reported) == [
     'CD3-', 'CD19+', 'CD20+-', 'CD38++', 'CD27++'
   ]
 
   reported = 'CD21hi/CD24int'
-  assert tokenize('Watson', symbols, suffixes, reported) == [
+  assert tokenize('Watson', suffixsymbs, suffixsyns, reported) == [
     'CD21++', 'CD24+~'
   ]
 
   reported = 'Annexin negative'
-  assert tokenize('Ltest', symbols, suffixes, reported) == [
+  assert tokenize('Ltest', suffixsymbs, suffixsyns, reported) == [
     'Annexin-'
   ]
 
   reported = 'CD3+ AND CD4+ AND small lymphocyte'
-  assert tokenize('VRC', symbols, suffixes, reported) == [
+  assert tokenize('VRC', suffixsymbs, suffixsyns, reported) == [
     'CD3+', 'CD4+', 'small_lymphocyte'
   ]
 
   reported = 'Lymphocytes and CD8+ and NP tet+'
-  assert tokenize('Ertl', symbols, suffixes, reported) == [
+  assert tokenize('Ertl', suffixsymbs, suffixsyns, reported) == [
     'Lymphocytes', 'CD8+', 'NP_tet+'
   ]
 
   reported = 'Activated T: viable/singlets/Lymph/CD3+'
-  assert tokenize('Stanford', symbols, suffixes, reported) == [
+  assert tokenize('Stanford', suffixsymbs, suffixsyns, reported) == [
     'viable', 'singlets', 'Lymph', 'CD3+'
   ]
 
-  ## TODO: Is this right?
+  # TODO: Is this right?
   reported = 'CD14-CD33-/CD3-/CD16+CD56+/CD94+'
-  assert tokenize('Stanford', symbols, suffixes, reported) == [
+  assert tokenize('Stanford', suffixsymbs, suffixsyns, reported) == [
     'CD14-', 'CD33-', 'CD3-', 'CD16+', 'CD56+', 'CD94+'
   ]
 
-  ## TODO: Is this right?
+  # TODO: Is this right?
   reported = 'Live cells/CD4 T cells/CD4+ CD45RA-/Uninfected/SSC low'
-  assert tokenize('Mayo', symbols, suffixes, reported) == [
+  assert tokenize('Mayo', suffixsymbs, suffixsyns, reported) == [
     'Live_cells', 'CD4_T_cells', 'CD4+', 'CD45RA-', 'Uninfected', 'SSC+-'
   ]
 
   reported = 'B220- live,doublet excluded,CD4+ CD44highCXCR5highPD1high,ICOS+'
-  assert tokenize('New York Influenza', symbols, suffixes, reported) == [
+  assert tokenize('New York Influenza', suffixsymbs, suffixsyns, reported) == [
     'B220-_live', 'doublet_excluded', 'CD4+', 'CD44++', 'CXCR5++', 'PD1++', 'ICOS+'
   ]
 
   reported = 'lymphocytes/singlets/live/CD19-CD14-/CD3+/CD8+/CD69+IFNg+IL2+TNFa+'
-  assert tokenize('New York Influenza', symbols, suffixes, reported) == [
-    'lymphocytes', 'singlets', 'live', 'CD19-', 'CD14-', 'CD3+', 'CD8+', 'CD69+', 'IFNg+', 'IL2+', 'TNFa+'
+  assert tokenize('New York Influenza', suffixsymbs, suffixsyns, reported) == [
+    'lymphocytes', 'singlets', 'live', 'CD19-', 'CD14-', 'CD3+', 'CD8+', 'CD69+', 'IFNg+', 'IL2+',
+    'TNFa+'
   ]
 
   reported = 'Alexa350 (high) + Alexa750 (medium)'
-  assert tokenize('Modeling Viral', symbols, suffixes, reported) == [
+  assert tokenize('Modeling Viral', suffixsymbs, suffixsyns, reported) == [
     'Alexa350++', 'Alexa750+~'
   ]
 
   reported = 'TNFa+IFNg-'
-  assert tokenize('Flow Cytometry Analysis', symbols, suffixes, reported) == [
+  assert tokenize('Flow Cytometry Analysis', suffixsymbs, suffixsyns, reported) == [
     'TNFa+', 'IFNg-'
   ]
