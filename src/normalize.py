@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import argparse
 import csv
@@ -257,3 +258,187 @@ def main():
 
 if __name__ == "__main__":
   main()
+
+
+# Unit tests for use with the tool `pytest` are defined below. To run these, run
+# `pytest normalize.py` from the command line.
+
+def test_normalize():
+  suffixsymbs = {
+    'high': '++',
+    'medium': '+~',
+    'low': '+-',
+    'positive': '+',
+    'negative': '-'
+  }
+
+  suffixsyns = {
+    'high': 'high',
+    'hi': 'high',
+    'bright': 'high',
+    'Bright': 'high',
+    'bri': 'high',
+    'br': 'high',
+    '(high)': 'high',
+    'medium': 'medium',
+    'med': 'medium',
+    'intermediate': 'medium',
+    'int': 'medium',
+    '(medium)': 'medium',
+    'low': 'low',
+    'lo': 'low',
+    'LO': 'low',
+    'dim': 'low',
+    'di': 'low',
+    '(low)': 'low',
+    'positive': 'positive',
+    'negative': 'negative'
+  }
+
+  gate_mappings = {
+    'Alexa350': 'PR:001',
+    'Alexa750': 'PR:002',
+    'Annexin': 'PR:003',
+    'B220-_live': 'PR:004',
+    'CCR7': 'PR:005',
+    'CD14': 'PR:006',
+    'CD16': 'PR:007',
+    'CD19': 'PR:008',
+    'CD20': 'PR:009',
+    'CD21': 'PR:010',
+    'CD24': 'PR:011',
+    'CD27': 'PR:012',
+    'CD3': 'PR:013',
+    'CD33': 'PR:014',
+    'CD38': 'PR:015',
+    'CD4': 'PR:016',
+    'CD44': 'PR:017',
+    'CD45RA': 'PR:018',
+    'CD4_T_cells': 'PR:019',
+    'CD56': 'PR:020',
+    'CD69': 'PR:021',
+    'CD8': 'PR:022',
+    'CD94': 'PR:023',
+    'CXCR5': 'PR:024',
+    'doublet_excluded': 'PR:025',
+    'ICOS': 'PR:026',
+    'IFNg': 'PR:027',
+    'IL2': 'PR:028',
+    'live': 'PR:029',
+    'Live_cells': 'PR:030',
+    'Lymph': 'PR:031',
+    'Lymphocytes': 'PR:032',
+    'lymphocytes': 'PR:033',
+    'Michael': 'PR:034',
+    'NP_tet': 'PR:035',
+    'PD1': 'PR:036',
+    'Robert': 'PR:037',
+    'singlets': 'PR:038',
+    'small_lymphocyte': 'PR:039',
+    'SSC': 'PR:040',
+    'TNFa': 'PR:041',
+    'Uninfected': 'PR:042',
+    'viable': 'PR:043',
+  }
+
+  special_gates = {
+    'Michael': {'Ontology ID': 'PR:034', 'Synonyms': 'Mike, Mickey, Mick',
+                'Toxic Synonym': 'Mikey'},
+    'Robert': {'Ontology ID': 'PR:037', 'Synonyms': 'Rob, Bob, Bert',
+               'Toxic Synonym': 'Bobert'}
+  }
+
+  reported = 'CD14-CD56-CD3+CD4+CD8-CD45RA+CCR7+'
+  tokens = tokenize('LaJolla', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['CD14-', 'CD56-', 'CD3+', 'CD4+', 'CD8-', 'CD45RA+', 'CCR7+']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:006-', 'PR:020-', 'PR:013+', 'PR:016+', 'PR:022-', 'PR:018+', 'PR:005+']
+
+  reported = 'CD3-, CD19+, CD20-, CD27hi, CD38hi'
+  tokens = tokenize('Emory', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['CD3-', 'CD19+', 'CD20-', 'CD27++', 'CD38++']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:013-', 'PR:008+', 'PR:009-', 'PR:012++', 'PR:015++']
+
+  reported = 'CD3-/CD19+/CD20lo/CD38hi/CD27hi'
+  tokens = tokenize('IPIRC', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['CD3-', 'CD19+', 'CD20+-', 'CD38++', 'CD27++']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:013-', 'PR:008+', 'PR:009+-', 'PR:015++', 'PR:012++']
+
+  reported = 'CD21hi/CD24int'
+  tokens = tokenize('Watson', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['CD21++', 'CD24+~']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:010++', 'PR:011+~']
+
+  reported = 'Annexin negative'
+  tokens = tokenize('Ltest', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['Annexin-']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:003-']
+
+  reported = 'CD3+ AND CD4+ AND small lymphocyte'
+  tokens = tokenize('VRC', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['CD3+', 'CD4+', 'small_lymphocyte']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:013+', 'PR:016+', 'PR:039']
+
+  reported = 'Lymphocytes and CD8+ and NP tet+'
+  tokens = tokenize('Ertl', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['Lymphocytes', 'CD8+', 'NP_tet+']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:032', 'PR:022+', 'PR:035+']
+
+  reported = 'Activated T: viable/singlets/Lymph/CD3+'
+  tokens = tokenize('Stanford', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['viable', 'singlets', 'Lymph', 'CD3+']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:043', 'PR:038', 'PR:031', 'PR:013+']
+
+  # TODO: Is this right?
+  reported = 'CD14-CD33-/CD3-/CD16+CD56+/CD94+'
+  tokens = tokenize('Stanford', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['CD14-', 'CD33-', 'CD3-', 'CD16+', 'CD56+', 'CD94+']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:006-', 'PR:014-', 'PR:013-', 'PR:007+', 'PR:020+', 'PR:023+']
+
+  # TODO: Is this right?
+  reported = 'Live cells/CD4 T cells/CD4+ CD45RA-/Uninfected/SSC low'
+  tokens = tokenize('Mayo', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['Live_cells', 'CD4_T_cells', 'CD4+', 'CD45RA-', 'Uninfected', 'SSC+-']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:030', 'PR:019', 'PR:016+', 'PR:018-', 'PR:042', 'PR:040+-']
+
+  reported = 'B220- live,doublet excluded,CD4+ CD44highCXCR5highPD1high,ICOS+'
+  tokens = tokenize('New York Influenza', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['B220-_live', 'doublet_excluded', 'CD4+', 'CD44++', 'CXCR5++', 'PD1++', 'ICOS+']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:004', 'PR:025', 'PR:016+', 'PR:017++', 'PR:024++', 'PR:036++',
+                        'PR:026+']
+
+  reported = 'lymphocytes/singlets/live/CD19-CD14-/CD3+/CD8+/CD69+IFNg+IL2+TNFa+'
+  tokens = tokenize('New York Influenza', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['lymphocytes', 'singlets', 'live', 'CD19-', 'CD14-', 'CD3+', 'CD8+', 'CD69+',
+                    'IFNg+', 'IL2+', 'TNFa+']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:033', 'PR:038', 'PR:029', 'PR:008-', 'PR:006-', 'PR:013+', 'PR:022+',
+                        'PR:021+', 'PR:027+', 'PR:028+', 'PR:041+']
+
+  reported = 'Alexa350 (high) + Alexa750 (medium)'
+  tokens = tokenize('Modeling Viral', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['Alexa350++', 'Alexa750+~']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:001++', 'PR:002+~']
+
+  reported = 'TNFa+IFNg-'
+  tokens = tokenize('Flow Cytometry Analysis', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['TNFa+', 'IFNg-']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:041+', 'PR:027-']
+
+  reported = 'Mikeyhigh/Rob+/Alexa350 (high)/CD33+ý'
+  tokens = tokenize('Some Project', suffixsymbs, suffixsyns, reported)
+  assert tokens == ['Mikey++', 'Rob+', 'Alexa350++', 'CD33+-']
+  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
+  assert ontologies == ['PR:034++', 'PR:037+', 'PR:001++', 'PR:014+-']
