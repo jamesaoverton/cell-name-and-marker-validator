@@ -59,12 +59,51 @@ def decorate_gate(kind, level):
 
   return gate
 
+def process_gate(gate_string):
+  for suffix in suffixes.keys():
+    if gate_string.endswith(suffix):
+      gate_string = re.sub('\s*' + re.escape(suffix) + '$', symbols[suffixes[suffix]], gate_string)
+      continue
+
+  kind_name = gate_string.rstrip('+-~')
+  level_name = re.search('[\-\+\~]*$', gate_string).group(0)
+  kind = None
+  if kind_name in synonym_iris:
+    kind = synonym_iris[kind_name]
+  level = None
+  if level_name == '':
+    level_name = '+'
+  if level_name in level_iris:
+    level = level_iris[level_name]
+  gate = {}
+
+  if kind:
+    gate = decorate_gate(kind, level)
+  else:
+    gate_errors = True
+  gate['gate'] = gate_string
+  gate['kind_name'] = kind_name
+  gate['level_name'] = level_names[level_name]
+
+  return gate
+
 
 @app.route('/', methods=['GET'])
 def my_app():
-  cells_field = 'CD4-positive, alpha-beta T cell'
+  cells_field = 'CD4-positive, alpha-beta T cell & CD19-'
   if 'cells' in request.args:
     cells_field = request.args['cells'].strip()
+  cell_gates = []
+  if '&' in cells_field:
+    cells_fields = cells_field.split('&', maxsplit=1)
+    cell_name = cells_fields[0].strip()
+    cell_gating = cells_fields[1].strip()
+    gate_strings = re.split(r';\s*', cell_gating)
+    for gate_string in gate_strings:
+      gate = process_gate(gate_string)
+      cell_gates.append(gate)
+  else:
+    cell_name = cells_field
 
   gates_field = 'CD4-; CD19+; CD20-; CD27++; CD38+-'
   if 'gates' in request.args:
@@ -76,18 +115,20 @@ def my_app():
 
   # Submit a: label, synonym, ID, or IRI
   cell_iri = None
-  if cells_field in synonym_iris:
-    cell_iri = synonym_iris[cells_field]
-  elif cells_field in iri_labels:
-    cell_iri = cells_field
+  if cell_name in synonym_iris:
+    cell_iri = synonym_iris[cell_name]
+  elif cell_name in iri_labels:
+    cell_iri = cell_name
   else:
-    iri = re.sub('^CL:', 'http://purl.obolibrary.org/obo/CL_', cells_field)
+    iri = re.sub('^CL:', 'http://purl.obolibrary.org/obo/CL_', cell_name)
     if iri in iri_labels:
       cell_iri = iri
 
   cell = {
     'recognized': False,
-    'conflicts': False
+    'conflicts': False,
+    'has_cell_gates': len(cell_gates) > 0,
+    'cell_gates': cell_gates
   }
   if cell_iri in iri_gates:
     cell['recognized'] = True
@@ -103,37 +144,15 @@ def my_app():
       if gate['level'] in iri_levels:
         gate['level_name'] = level_names[iri_levels[gate['level']]]
       cell_results.append(gate)
+    cell_results = cell_results + cell_gates
 
   gate_strings = re.split(r';\s*', gates_field)
   gate_errors = False
   for gate_string in gate_strings:
-    for suffix in suffixes.keys():
-      if gate_string.endswith(suffix):
-        gate_string = re.sub('\s*' + re.escape(suffix) + '$', symbols[suffixes[suffix]], gate_string)
-        continue
-
-    kind_name = gate_string.rstrip('+-~')
-    level_name = re.search('[\-\+\~]*$', gate_string).group(0)
-    kind = None
-    if kind_name in synonym_iris:
-      kind = synonym_iris[kind_name]
-    level = None
-    if level_name == '':
-      level_name = '+'
-    if level_name in level_iris:
-      level = level_iris[level_name]
-    gate = {}
-
-    if kind:
-      gate = decorate_gate(kind, level)
-    else:
-      gate_errors = True
-    gate['gate'] = gate_string
-    gate['kind_name'] = kind_name
-    gate['level_name'] = level_names[level_name]
+    gate = process_gate(gate_string)
 
     for cell_result in cell_results:
-      if kind == cell_result['kind'] and level != cell_result['level']:
+      if gate['kind'] == cell_result['kind'] and gate['level'] != cell_result['level']:
         gate['conflict'] = True
         cell_result['conflict'] = True
         cell['conflicts'] = True
