@@ -28,7 +28,7 @@ form {
       <div class="row">
         <form>
           <div class="col-md-6">
-            <h2>Cells</h2>
+            <h2>Cell Population Name</h2>
             <p>
             Enter a cell type from the <a href="http://obofoundry.org/ontology/cl.html">Cell Ontology</a>
             (<a href="https://www.ebi.ac.uk/ols/ontologies/cl">search on OLS</a>).
@@ -40,7 +40,7 @@ form {
             <a href="/" class="btn btn-info" role="button">Reset</a>
           </div>
           <div class="col-md-6">
-            <h2>Gates</h2>
+            <h2>Gating Definition</h2>
             <p>
             Enter a list of gates
             from the <a href="https://pir.georgetown.edu/pro/">Protein Ontology</a>
@@ -188,7 +188,7 @@ form {
       <div class="row">
         <div class="col-md-6">
           {% if cell.recognized %}
-          <h3>Cell Definition</h3>
+          <h3>Cell Logical Definition</h3>
           <p>
           <a href="{{ cell.parent }}">{{ cell.parent_label }}</a>
           </p>
@@ -207,7 +207,7 @@ form {
 
         <div class="col-md-6">
           {% if cell.recognized and not gate_errors %}
-          <h3>Gate Definition</h3>
+          <h3>Gate Logical Definition</h3>
           <p>
           <a href="{{ cell.iri }}">{{ cell.label }}</a>
           </p>
