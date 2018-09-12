@@ -79,12 +79,13 @@ form {
               from the <a href="https://pir.georgetown.edu/pro/">Protein Ontology</a>
               (<a href="https://www.ebi.ac.uk/ols/ontologies/pr">search on OLS</a>)
               or our <a href="https://docs.google.com/spreadsheets/d/1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI/edit?usp=sharing">list of special gates</a>.
+              Gates should be separated by semi-colons.
             </p>
           {% else %}
             <p>
             {% for result in gate_results %}
             {% if result.kind_recognized %}
-            <a href="{{ result.kind }}">{{ result.gate }}</a>
+            <a href="{{ result.kind }}">{{ result.gate }}</a>{% if not loop.last %};{% endif %}
             {% endif %}
             {% endfor %}
             </p>

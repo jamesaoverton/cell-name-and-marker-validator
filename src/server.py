@@ -66,7 +66,7 @@ def my_app():
   if 'cells' in request.args:
     cells_field = request.args['cells'].strip()
 
-  gates_field = 'CD4- CD19+ CD20- CD27++ CD38+-'
+  gates_field = 'CD4-; CD19+; CD20-; CD27++; CD38+-'
   if 'gates' in request.args:
     gates_field = request.args['gates'].strip()
 
@@ -104,7 +104,7 @@ def my_app():
         gate['level_name'] = level_names[iri_levels[gate['level']]]
       cell_results.append(gate)
 
-  gate_strings = re.findall('\w+[\+\~\-]*', gates_field)
+  gate_strings = re.split(r';\s*', gates_field)
   gate_errors = False
   for gate_string in gate_strings:
     for suffix in suffixes.keys():
