@@ -1,5 +1,7 @@
 # HIPC Gates Validation Demo
 
+[![Build Status](https://travis-ci.com/jamesaoverton/hipc-gates.svg?branch=master)](https://travis-ci.com/jamesaoverton/hipc-gates)
+
 This project demonstrates how [Human Immunology Project Consortium](https://www.immuneprofiling.org/hipc/page/show) (HIPC) data about cell populations and gating strategies can be transformed into semantically rich linked data and validated, using ontologies such as the [Protein Ontology](https://pir.georgetown.edu/pro/) and [Cell Ontology](http://obofoundry.org/ontology/cl.html).
 
 
