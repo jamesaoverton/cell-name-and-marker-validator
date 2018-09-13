@@ -129,7 +129,7 @@ def tokenize(projname, suffixsymbs, suffixsyns, reported):
   return tokenized
 
 
-def normalize(gates, gate_mappings, special_gates, symbols):
+def normalize(gates, gate_mappings, special_gates, preferred, symbols):
   """
   Normalise a tokenised list of gates by replacing gate labels with ontology ids
 
@@ -151,28 +151,43 @@ def normalize(gates, gate_mappings, special_gates, symbols):
     # If we get to here then there isn't a suffix.
     return [gate, '']
 
-  normalized_gates = []
+  ontologized_gates = []
+  preferred_label_gates = []
   for gate in gates:
-    # First try to find the ontology id in the gate_mappings map. If it isn't there, check to
+    label, suffixsymb = split_gate(gate)
+    # Get any label / ontology id pairs corresponding to the synonym represented by `gate` from
+    # the special_gates dictionary.
+    special_entries = [{'label': key, 'ontid': val['Ontology ID']}
+                       for key, val in special_gates.items()
+                       if label and (label == key or label in val['Synonyms'].split(', ')
+                                     or label == val['Toxic Synonym'])]
+
+    # This shouldn't happen unless there are duplicate names in the special gates file:
+    if special_entries and len(special_entries) > 1:
+      print("Warning: {} ontology ids found with label: '{}'"
+            .format(len(special_entries), gate))
+
+    # Now try to find the ontology id in the gate_mappings map. If it isn't there, check to
     # see if it has a synonym in the map of special gates. If we don't find it there either, then
     # prefix the gate with a '!'.
-    label, suffixsymb = split_gate(gate)
     ontology_id = gate_mappings.get(label)
     if not ontology_id:
-      ontids_from_special = [val['Ontology ID'] for key, val in special_gates.items() if label and (
-        label == key or label in val['Synonyms'].split(', ') or label == val['Toxic Synonym'])]
-      if ontids_from_special and len(ontids_from_special) > 1:
-        # This shouldn't happen unless there are duplicate names in the special gates file
-        print("Warning: {} ontology ids found with label: '{}'"
-              .format(len(ontids_from_special), gate))
+      # If this gate is a synonym of a special gate, then look up its ontology id there:
+      ontology_id = special_entries[0]['ontid'] if special_entries else "!{}".format(label)
 
-      ontology_id = ontids_from_special[0] if ontids_from_special else "!{}".format(label)
+    # Look up the preferred label for a gate based on the ontology id. If we can't find it in the
+    # preferred gates list, check to see if it is the synonym of a special gate and if so, use that
+    # label. Otherwise prefix it with a '!'.
+    preferred_label = (preferred.get(ontology_id, special_entries[0]['label']
+                                     if special_entries else '!{}'.format(label)))
+    preferred_label_gates.append(preferred_label + suffixsymb)
 
-    # Replace the long form of an ontology ID (which includes a URL) with its short form: 'PR:<id>'
+    # Replace any occurences of the long form of an ontology ID (which includes a URL) with its
+    # short form: 'PR:<id>'
     ontology_id = ontology_id.replace('http://purl.obolibrary.org/obo/PR_', 'PR:')
-    normalized_gates.append(ontology_id + suffixsymb)
+    ontologized_gates.append(ontology_id + suffixsymb)
 
-  return normalized_gates
+  return preferred_label_gates, ontologized_gates
 
 
 def main():
@@ -186,6 +201,8 @@ def main():
                       help='a TSV file which maps gate labels to ontology ids/keywords')
   parser.add_argument('special', type=argparse.FileType('r'),
                       help='a TSV file containing extra information about a subset of gates')
+  parser.add_argument('preferred', type=argparse.FileType('r'),
+                      help='a TSV file which maps ontology ids to preferred labels')
   parser.add_argument('source', type=argparse.FileType('r'),
                       help='the source data TSV file')
   parser.add_argument('output', type=str,
@@ -234,6 +251,13 @@ def main():
       'Synonyms': row['Synonyms'],
       'Toxic Synonym': row['toxic synonym']}
 
+  # Load the contents of the file given by the command-line parameter args.preferred.
+  # This file associates ontology ids with preferred gate labels (i.e. pr#PRO-short-label).
+  rows = csv.DictReader(args.preferred, delimiter='\t')
+  preferred = {}
+  for row in rows:
+    preferred[row['Ontology ID']] = row['Preferred Label']
+
   # Finally, load the contents of the source file. For each row determine the tokenised and
   # normalised population definition based on the definition reported in the source file and our
   # scaling indicators. Then copy the row into a new file with additional columns containing the
@@ -241,16 +265,19 @@ def main():
   rows = csv.DictReader(args.source, delimiter='\t')
   with open(args.output, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
-    output_fieldnames = rows.fieldnames + ['Gating tokenized'] + ['Gating mapped to ontologies']
+    output_fieldnames = rows.fieldnames + (
+      ['Gating tokenized'] + ['Gating preferred labels'] + ['Gating mapped to ontologies'])
     w.writerow(output_fieldnames)
     for row in rows:
       if not row['EXPERIMENT_ACCESSION'] in excluded_experiments:
         # Remove any surrounding quotation marks
         reported = row['POPULATION_DEFNITION_REPORTED'].strip('"').strip("'")
-        gates = tokenize(row['NAME'], suffixsymbs, suffixsyns, reported)
-        row['Gating tokenized'] = '; '.join(gates)
-        ontologies = normalize(gates, gate_mappings, special_gates, suffixsymbs.values())
-        row['Gating mapped to ontologies'] = '; '.join(ontologies)
+        tokenized_gates = tokenize(row['NAME'], suffixsymbs, suffixsyns, reported)
+        row['Gating tokenized'] = '; '.join(tokenized_gates)
+        preferized_gates, ontologized_gates = normalize(
+          tokenized_gates, gate_mappings, special_gates, preferred, suffixsymbs.values())
+        row['Gating mapped to ontologies'] = '; '.join(ontologized_gates)
+        row['Gating preferred labels'] = '; '.join(preferized_gates)
         # Explicitly reference output_fieldnames here to make sure that the order in which the data
         # is written to the file matches the header order.
         w.writerow([row[fn] for fn in output_fieldnames])
@@ -296,49 +323,49 @@ def test_normalize():
   }
 
   gate_mappings = {
-    'Alexa350': 'PR:001',
-    'Alexa750': 'PR:002',
-    'Annexin': 'PR:003',
-    'B220-_live': 'PR:004',
-    'CCR7': 'PR:005',
-    'CD14': 'PR:006',
-    'CD16': 'PR:007',
-    'CD19': 'PR:008',
-    'CD20': 'PR:009',
-    'CD21': 'PR:010',
-    'CD24': 'PR:011',
-    'CD27': 'PR:012',
-    'CD3': 'PR:013',
-    'CD33': 'PR:014',
-    'CD38': 'PR:015',
-    'CD4': 'PR:016',
-    'CD44': 'PR:017',
-    'CD45RA': 'PR:018',
-    'CD4_T_cells': 'PR:019',
-    'CD56': 'PR:020',
-    'CD69': 'PR:021',
-    'CD8': 'PR:022',
-    'CD94': 'PR:023',
-    'CXCR5': 'PR:024',
-    'doublet_excluded': 'PR:025',
-    'ICOS': 'PR:026',
-    'IFNg': 'PR:027',
-    'IL2': 'PR:028',
-    'live': 'PR:029',
-    'Live_cells': 'PR:030',
-    'Lymph': 'PR:031',
-    'Lymphocytes': 'PR:032',
-    'lymphocytes': 'PR:033',
-    'Michael': 'PR:034',
-    'NP_tet': 'PR:035',
-    'PD1': 'PR:036',
-    'Robert': 'PR:037',
-    'singlets': 'PR:038',
-    'small_lymphocyte': 'PR:039',
-    'SSC': 'PR:040',
-    'TNFa': 'PR:041',
-    'Uninfected': 'PR:042',
-    'viable': 'PR:043',
+    'Alexa350': 'http://purl.obolibrary.org/obo/PR_001',
+    'Alexa750': 'http://purl.obolibrary.org/obo/PR_002',
+    'Annexin': 'http://purl.obolibrary.org/obo/PR_003',
+    'B220-_live': 'http://purl.obolibrary.org/obo/PR_004',
+    'CCR7': 'http://purl.obolibrary.org/obo/PR_005',
+    'CD14': 'http://purl.obolibrary.org/obo/PR_006',
+    'CD16': 'http://purl.obolibrary.org/obo/PR_007',
+    'CD19': 'http://purl.obolibrary.org/obo/PR_008',
+    'CD20': 'http://purl.obolibrary.org/obo/PR_009',
+    'CD21': 'http://purl.obolibrary.org/obo/PR_010',
+    'CD24': 'http://purl.obolibrary.org/obo/PR_011',
+    'CD27': 'http://purl.obolibrary.org/obo/PR_012',
+    'CD3': 'http://purl.obolibrary.org/obo/PR_013',
+    'CD33': 'http://purl.obolibrary.org/obo/PR_014',
+    'CD38': 'http://purl.obolibrary.org/obo/PR_015',
+    'CD4': 'http://purl.obolibrary.org/obo/PR_016',
+    'CD44': 'http://purl.obolibrary.org/obo/PR_017',
+    'CD45RA': 'http://purl.obolibrary.org/obo/PR_018',
+    'CD4_T_cells': 'http://purl.obolibrary.org/obo/PR_019',
+    'CD56': 'http://purl.obolibrary.org/obo/PR_020',
+    'CD69': 'http://purl.obolibrary.org/obo/PR_021',
+    'CD8': 'http://purl.obolibrary.org/obo/PR_022',
+    'CD94': 'http://purl.obolibrary.org/obo/PR_023',
+    'CXCR5': 'http://purl.obolibrary.org/obo/PR_024',
+    'doublet_excluded': 'http://purl.obolibrary.org/obo/PR_025',
+    'ICOS': 'http://purl.obolibrary.org/obo/PR_026',
+    'IFNg': 'http://purl.obolibrary.org/obo/PR_027',
+    'IL2': 'http://purl.obolibrary.org/obo/PR_028',
+    'live': 'http://purl.obolibrary.org/obo/PR_029',
+    'Live_cells': 'http://purl.obolibrary.org/obo/PR_030',
+    'Lymph': 'http://purl.obolibrary.org/obo/PR_031',
+    'Lymphocytes': 'http://purl.obolibrary.org/obo/PR_032',
+    'lymphocytes': 'http://purl.obolibrary.org/obo/PR_033',
+    'Michael': 'http://purl.obolibrary.org/obo/PR_034',
+    'NP_tet': 'http://purl.obolibrary.org/obo/PR_035',
+    'PD1': 'http://purl.obolibrary.org/obo/PR_036',
+    'Robert': 'http://purl.obolibrary.org/obo/PR_037',
+    'singlets': 'http://purl.obolibrary.org/obo/PR_038',
+    'small_lymphocyte': 'http://purl.obolibrary.org/obo/PR_039',
+    'SSC': 'http://purl.obolibrary.org/obo/PR_040',
+    'TNFa': 'http://purl.obolibrary.org/obo/PR_041',
+    'Uninfected': 'http://purl.obolibrary.org/obo/PR_042',
+    'viable': 'http://purl.obolibrary.org/obo/PR_043',
   }
 
   special_gates = {
@@ -348,97 +375,175 @@ def test_normalize():
                'Toxic Synonym': 'Bobert'}
   }
 
+  preferred = {
+    'http://purl.obolibrary.org/obo/PR_001': 'pref001',
+    'http://purl.obolibrary.org/obo/PR_002': 'pref002',
+    'http://purl.obolibrary.org/obo/PR_003': 'pref003',
+    'http://purl.obolibrary.org/obo/PR_004': 'pref004',
+    'http://purl.obolibrary.org/obo/PR_005': 'pref005',
+    'http://purl.obolibrary.org/obo/PR_006': 'pref006',
+    'http://purl.obolibrary.org/obo/PR_007': 'pref007',
+    'http://purl.obolibrary.org/obo/PR_008': 'pref008',
+    'http://purl.obolibrary.org/obo/PR_009': 'pref009',
+    'http://purl.obolibrary.org/obo/PR_010': 'pref010',
+    'http://purl.obolibrary.org/obo/PR_011': 'pref011',
+    'http://purl.obolibrary.org/obo/PR_012': 'pref012',
+    'http://purl.obolibrary.org/obo/PR_013': 'pref013',
+    'http://purl.obolibrary.org/obo/PR_014': 'pref014',
+    'http://purl.obolibrary.org/obo/PR_015': 'pref015',
+    'http://purl.obolibrary.org/obo/PR_016': 'pref016',
+    'http://purl.obolibrary.org/obo/PR_017': 'pref017',
+    'http://purl.obolibrary.org/obo/PR_018': 'pref018',
+    'http://purl.obolibrary.org/obo/PR_019': 'pref019',
+    'http://purl.obolibrary.org/obo/PR_020': 'pref020',
+    'http://purl.obolibrary.org/obo/PR_021': 'pref021',
+    'http://purl.obolibrary.org/obo/PR_022': 'pref022',
+    'http://purl.obolibrary.org/obo/PR_023': 'pref023',
+    'http://purl.obolibrary.org/obo/PR_024': 'pref024',
+    'http://purl.obolibrary.org/obo/PR_025': 'pref025',
+    'http://purl.obolibrary.org/obo/PR_026': 'pref026',
+    'http://purl.obolibrary.org/obo/PR_027': 'pref027',
+    'http://purl.obolibrary.org/obo/PR_028': 'pref028',
+    'http://purl.obolibrary.org/obo/PR_029': 'pref029',
+    'http://purl.obolibrary.org/obo/PR_030': 'pref030',
+    'http://purl.obolibrary.org/obo/PR_031': 'pref031',
+    'http://purl.obolibrary.org/obo/PR_032': 'pref032',
+    'http://purl.obolibrary.org/obo/PR_033': 'pref033',
+    'http://purl.obolibrary.org/obo/PR_035': 'pref035',
+    'http://purl.obolibrary.org/obo/PR_036': 'pref036',
+    'http://purl.obolibrary.org/obo/PR_038': 'pref038',
+    'http://purl.obolibrary.org/obo/PR_039': 'pref039',
+    'http://purl.obolibrary.org/obo/PR_040': 'pref040',
+    'http://purl.obolibrary.org/obo/PR_041': 'pref041',
+    'http://purl.obolibrary.org/obo/PR_042': 'pref042',
+  }
+
   reported = 'CD14-CD56-CD3+CD4+CD8-CD45RA+CCR7+'
-  tokens = tokenize('LaJolla', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['CD14-', 'CD56-', 'CD3+', 'CD4+', 'CD8-', 'CD45RA+', 'CCR7+']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:006-', 'PR:020-', 'PR:013+', 'PR:016+', 'PR:022-', 'PR:018+', 'PR:005+']
+  tokenized = tokenize('LaJolla', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['CD14-', 'CD56-', 'CD3+', 'CD4+', 'CD8-', 'CD45RA+', 'CCR7+']
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:006-', 'PR:020-', 'PR:013+', 'PR:016+', 'PR:022-', 'PR:018+',
+                         'PR:005+']
+  assert preferized == ['pref006-', 'pref020-', 'pref013+', 'pref016+', 'pref022-', 'pref018+',
+                        'pref005+']
 
   reported = 'CD3-, CD19+, CD20-, CD27hi, CD38hi'
-  tokens = tokenize('Emory', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['CD3-', 'CD19+', 'CD20-', 'CD27++', 'CD38++']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:013-', 'PR:008+', 'PR:009-', 'PR:012++', 'PR:015++']
+  tokenized = tokenize('Emory', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['CD3-', 'CD19+', 'CD20-', 'CD27++', 'CD38++']
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:013-', 'PR:008+', 'PR:009-', 'PR:012++', 'PR:015++']
+  assert preferized == ['pref013-', 'pref008+', 'pref009-', 'pref012++', 'pref015++']
 
   reported = 'CD3-/CD19+/CD20lo/CD38hi/CD27hi'
-  tokens = tokenize('IPIRC', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['CD3-', 'CD19+', 'CD20+-', 'CD38++', 'CD27++']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:013-', 'PR:008+', 'PR:009+-', 'PR:015++', 'PR:012++']
+  tokenized = tokenize('IPIRC', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['CD3-', 'CD19+', 'CD20+-', 'CD38++', 'CD27++']
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:013-', 'PR:008+', 'PR:009+-', 'PR:015++', 'PR:012++']
+  assert preferized == ['pref013-', 'pref008+', 'pref009+-', 'pref015++', 'pref012++']
 
   reported = 'CD21hi/CD24int'
-  tokens = tokenize('Watson', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['CD21++', 'CD24+~']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:010++', 'PR:011+~']
+  tokenized = tokenize('Watson', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['CD21++', 'CD24+~']
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:010++', 'PR:011+~']
+  assert preferized == ['pref010++', 'pref011+~']
 
   reported = 'Annexin negative'
-  tokens = tokenize('Ltest', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['Annexin-']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:003-']
+  tokenized = tokenize('Ltest', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['Annexin-']
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:003-']
+  assert preferized == ['pref003-']
 
   reported = 'CD3+ AND CD4+ AND small lymphocyte'
-  tokens = tokenize('VRC', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['CD3+', 'CD4+', 'small_lymphocyte']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:013+', 'PR:016+', 'PR:039']
+  tokenized = tokenize('VRC', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['CD3+', 'CD4+', 'small_lymphocyte']
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:013+', 'PR:016+', 'PR:039']
+  assert preferized == ['pref013+', 'pref016+', 'pref039']
 
   reported = 'Lymphocytes and CD8+ and NP tet+'
-  tokens = tokenize('Ertl', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['Lymphocytes', 'CD8+', 'NP_tet+']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:032', 'PR:022+', 'PR:035+']
+  tokenized = tokenize('Ertl', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['Lymphocytes', 'CD8+', 'NP_tet+']
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:032', 'PR:022+', 'PR:035+']
+  assert preferized == ['pref032', 'pref022+', 'pref035+']
 
   reported = 'Activated T: viable/singlets/Lymph/CD3+'
-  tokens = tokenize('Stanford', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['viable', 'singlets', 'Lymph', 'CD3+']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:043', 'PR:038', 'PR:031', 'PR:013+']
+  tokenized = tokenize('Stanford', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['viable', 'singlets', 'Lymph', 'CD3+']
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:043', 'PR:038', 'PR:031', 'PR:013+']
+  assert preferized == ['!viable', 'pref038', 'pref031', 'pref013+']
 
   # TODO: Is this right?
   reported = 'CD14-CD33-/CD3-/CD16+CD56+/CD94+'
-  tokens = tokenize('Stanford', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['CD14-', 'CD33-', 'CD3-', 'CD16+', 'CD56+', 'CD94+']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:006-', 'PR:014-', 'PR:013-', 'PR:007+', 'PR:020+', 'PR:023+']
+  tokenized = tokenize('Stanford', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['CD14-', 'CD33-', 'CD3-', 'CD16+', 'CD56+', 'CD94+']
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:006-', 'PR:014-', 'PR:013-', 'PR:007+', 'PR:020+', 'PR:023+']
+  assert preferized == ['pref006-', 'pref014-', 'pref013-', 'pref007+', 'pref020+', 'pref023+']
 
   # TODO: Is this right?
   reported = 'Live cells/CD4 T cells/CD4+ CD45RA-/Uninfected/SSC low'
-  tokens = tokenize('Mayo', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['Live_cells', 'CD4_T_cells', 'CD4+', 'CD45RA-', 'Uninfected', 'SSC+-']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:030', 'PR:019', 'PR:016+', 'PR:018-', 'PR:042', 'PR:040+-']
+  tokenized = tokenize('Mayo', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['Live_cells', 'CD4_T_cells', 'CD4+', 'CD45RA-', 'Uninfected', 'SSC+-']
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:030', 'PR:019', 'PR:016+', 'PR:018-', 'PR:042', 'PR:040+-']
+  assert preferized == ['pref030', 'pref019', 'pref016+', 'pref018-', 'pref042', 'pref040+-']
 
   reported = 'B220- live,doublet excluded,CD4+ CD44highCXCR5highPD1high,ICOS+'
-  tokens = tokenize('New York Influenza', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['B220-_live', 'doublet_excluded', 'CD4+', 'CD44++', 'CXCR5++', 'PD1++', 'ICOS+']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:004', 'PR:025', 'PR:016+', 'PR:017++', 'PR:024++', 'PR:036++',
+  tokenized = tokenize('New York Influenza', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['B220-_live', 'doublet_excluded', 'CD4+', 'CD44++', 'CXCR5++', 'PD1++',
+                       'ICOS+']
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:004', 'PR:025', 'PR:016+', 'PR:017++', 'PR:024++', 'PR:036++',
                         'PR:026+']
+  assert preferized == ['pref004', 'pref025', 'pref016+', 'pref017++', 'pref024++', 'pref036++',
+                        'pref026+']
 
   reported = 'lymphocytes/singlets/live/CD19-CD14-/CD3+/CD8+/CD69+IFNg+IL2+TNFa+'
-  tokens = tokenize('New York Influenza', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['lymphocytes', 'singlets', 'live', 'CD19-', 'CD14-', 'CD3+', 'CD8+', 'CD69+',
+  tokenized = tokenize('New York Influenza', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['lymphocytes', 'singlets', 'live', 'CD19-', 'CD14-', 'CD3+', 'CD8+', 'CD69+',
                     'IFNg+', 'IL2+', 'TNFa+']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:033', 'PR:038', 'PR:029', 'PR:008-', 'PR:006-', 'PR:013+', 'PR:022+',
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:033', 'PR:038', 'PR:029', 'PR:008-', 'PR:006-', 'PR:013+', 'PR:022+',
                         'PR:021+', 'PR:027+', 'PR:028+', 'PR:041+']
+  assert preferized == ['pref033', 'pref038', 'pref029', 'pref008-', 'pref006-', 'pref013+',
+                        'pref022+', 'pref021+', 'pref027+', 'pref028+', 'pref041+']
 
   reported = 'Alexa350 (high) + Alexa750 (medium)'
-  tokens = tokenize('Modeling Viral', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['Alexa350++', 'Alexa750+~']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:001++', 'PR:002+~']
+  tokenized = tokenize('Modeling Viral', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['Alexa350++', 'Alexa750+~']
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:001++', 'PR:002+~']
+  assert preferized == ['pref001++', 'pref002+~']
 
   reported = 'TNFa+IFNg-'
-  tokens = tokenize('Flow Cytometry Analysis', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['TNFa+', 'IFNg-']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:041+', 'PR:027-']
+  tokenized = tokenize('Flow Cytometry Analysis', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['TNFa+', 'IFNg-']
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:041+', 'PR:027-']
+  assert preferized == ['pref041+', 'pref027-']
 
   reported = 'Mikeyhigh/Rob+/Alexa350 (high)/CD33+ý'
-  tokens = tokenize('Some Project', suffixsymbs, suffixsyns, reported)
-  assert tokens == ['Mikey++', 'Rob+', 'Alexa350++', 'CD33+-']
-  ontologies = normalize(tokens, gate_mappings, special_gates, suffixsymbs.values())
-  assert ontologies == ['PR:034++', 'PR:037+', 'PR:001++', 'PR:014+-']
+  tokenized = tokenize('Some Project', suffixsymbs, suffixsyns, reported)
+  assert tokenized == ['Mikey++', 'Rob+', 'Alexa350++', 'CD33+-']
+  preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
+                                      suffixsymbs.values())
+  assert ontologized == ['PR:034++', 'PR:037+', 'PR:001++', 'PR:014+-']
+  assert preferized == ['Michael++', 'Robert+', 'pref001++', 'pref014+-']
