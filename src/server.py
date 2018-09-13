@@ -66,6 +66,7 @@ def process_gate(gate_string):
       continue
 
   kind_name = gate_string.rstrip('+-~')
+  kind_name = re.sub('\[.*\]', '', kind_name)
   level_name = re.search('[\-\+\~]*$', gate_string).group(0)
   kind = None
   if kind_name in synonym_iris:
@@ -77,9 +78,8 @@ def process_gate(gate_string):
     level = level_iris[level_name]
   gate = {}
 
-  if kind:
-    gate = decorate_gate(kind, level)
-  else:
+  gate = decorate_gate(kind, level)
+  if not kind:
     gate_errors = True
   gate['gate'] = gate_string
   gate['kind_name'] = kind_name
@@ -105,7 +105,7 @@ def my_app():
   else:
     cell_name = cells_field
 
-  gates_field = 'CD4-; CD19+; CD20-; CD27++; CD38+-'
+  gates_field = 'CD4-; CD19+; CD20-; CD27++; CD38+-; infected[Dengue virus]; CD56[glycosylated]+'
   if 'gates' in request.args:
     gates_field = request.args['gates'].strip()
 
