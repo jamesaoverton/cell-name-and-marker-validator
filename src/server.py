@@ -52,6 +52,8 @@ def decorate_gate(kind, level):
   if kind in iri_labels:
     gate['kind_recognized'] = True
     gate['kind_label'] = iri_labels[kind] 
+  if kind and not kind.startswith('http'):
+    gate['kind'] = '?gate=' + kind
 
   if level in iri_labels:
     gate['level_recognized'] = True
@@ -90,6 +92,10 @@ def process_gate(gate_string):
 
 @app.route('/', methods=['GET'])
 def my_app():
+  if 'gate' in request.args:
+    special_gate = request.args['gate'].strip()
+    return render_template('/gate.html', special_gate=special_gate)
+
   cells_field = 'CD4-positive, alpha-beta T cell & CD19-'
   if 'cells' in request.args:
     cells_field = request.args['cells'].strip()
