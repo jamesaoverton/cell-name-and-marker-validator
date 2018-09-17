@@ -118,7 +118,7 @@ build/cl-exact-synonyms.tsv: build/cl.nt | build
 # See the script files for more documentation.
 
 # Normalize the cell population strings across studies
-build/normalized.tsv: src/normalize.py build/excluded-experiments.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv source.tsv | build
+build/normalized.tsv: src/normalize.py build/excluded-experiments.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv build/pr-pro-short-labels.tsv source.tsv | build
 	$^ $@
 
 # Map gate labels to IDs and report results
