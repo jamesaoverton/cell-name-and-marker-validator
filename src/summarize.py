@@ -19,12 +19,12 @@ def main():
   rows = csv.DictReader(args.report, delimiter='\t')
   for row in rows:
     center = row['NAME']
-    gates = re.split('\s+', row['POPULATION_DEFNITION_TYPES'])
+    gates = re.split(';\s+', row['Gating mapped to ontologies'])
     perfect = True
     for gate in gates:
       centers[center]['TOTAL_GATES'] += 1
       centers['TOTAL']['TOTAL_GATES'] += 1
-      if gate.startswith('['):
+      if gate.startswith('!'):
         perfect = False
       else:
         centers[center]['MATCHED_GATES'] += 1

@@ -2,18 +2,6 @@
 
 import argparse, csv, re
 
-def report(gate_types, normalized):
-  gates = re.split('\s+', normalized)
-  ids = []
-  for gate in gates:
-    name = gate.rstrip('+-~')
-    level = re.search('[\-\+\~]*$', gate).group(0)
-    if name in gate_types:
-      ids.append(gate_types[name] + level)
-    else:
-      ids.append('[' + name + ']' + level)
-  return ids
-
 def main():
   parser = argparse.ArgumentParser(
       description='Parse HIPC cell')
@@ -37,18 +25,17 @@ def main():
   rows = csv.DictReader(args.normalized, delimiter='\t')
   with open(args.output, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
-    w.writerow(list(next(rows).keys()) + ['POPULATION_DEFNITION_TYPES', 'MATCHED_GATES', 'TOTAL_GATES'])
+    w.writerow(list(next(rows).keys()) + ['MATCHED_GATES', 'TOTAL_GATES'])
     for row in rows:
-      normalized = row['POPULATION_DEFNITION_NORMALIZED']
+      normalized = row['Gating mapped to ontologies']
       if normalized:
-        ids = report(gate_types, normalized)
+        ids = re.split(';\s+', normalized)
         matched_gates = 0
         total_gates = 0
         for i in ids:
           total_gates += 1
-          if not i.startswith('['):
+          if not i.startswith('!'):
             matched_gates += 1
-        row['POPULATION_DEFNITION_TYPES'] = ' '.join(ids)
         row['MATCHED_GATES'] = matched_gates
         row['TOTAL_GATES'] = total_gates
         w.writerow(row.values())

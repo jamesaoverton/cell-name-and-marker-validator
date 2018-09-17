@@ -22,9 +22,9 @@ def main():
 
   rows = csv.DictReader(args.normalized, delimiter='\t')
   for row in rows:
-    normalized = row['POPULATION_DEFNITION_NORMALIZED']
+    normalized = row['Gating mapped to ontologies']
     if normalized:
-      gates = re.split('\s+', normalized)
+      gates = re.split(';\s+', normalized)
       for gate in gates:
         gate = gate.rstrip('-+~')
         all_gates[gate] += 1
@@ -35,6 +35,7 @@ def main():
     w.writerow(['Ontology ID', 'Gate', 'Count'])
     for row in rows:
       (curie, gate) = row
+      curie = curie.replace('http://purl.obolibrary.org/obo/PR_', 'PR:')
       if gate in all_gates:
         count = all_gates[gate]
         if gate in matched_gates:

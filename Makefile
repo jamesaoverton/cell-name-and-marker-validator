@@ -42,9 +42,9 @@ build:
 # Most of the configuration is build into this Google Sheet:
 # https://docs.google.com/spreadsheets/d/1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI/edit#gid=0
 
-# Download the 'Specia Gates' sheet as TSV
+# Download the 'Specia Gates for OBI' sheet as TSV
 build/special-gates.tsv: | build
-	curl -L -o $@ "https://docs.google.com/spreadsheets/u/0/d/1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI/export?format=tsv"
+	curl -L -o $@ "https://docs.google.com/spreadsheets/d/1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI/export?format=tsv&id=1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI&gid=1143376972"
 
 # Download the 'Value Scale' sheet as TSV
 build/value-scale.tsv: | build
@@ -63,23 +63,26 @@ build/excluded-experiments.tsv: | build
 build/pr.owl: | build
 	curl -k -L -o $@ "http://purl.obolibrary.org/obo/pr.owl"
 
+build/pr.nt: build/pr.owl | build
+	rapper $< > $@
+
 # Extract a table of rdfs:label for (proper) PR terms.
-build/pr-labels.tsv: build/pr.owl | build
-	rapper $< \
-	| grep '^<http://purl.obolibrary.org/obo/PR_0' \
+build/pr-labels.tsv: build/pr.nt | build
+	grep '^<http://purl.obolibrary.org/obo/PR_0' $< \
 	| grep '> <http://www.w3.org/2000/01/rdf-schema#label> "' \
 	| sed 's/^<\(.*\)> <.*> "\(.*\)".*$$/\1	\2/' \
 	> $@
 
 # Extract a table of oio:hasExactSynonyms for (proper) PR terms.
 # We want the "PRO-short-label" but unfortunately that's in an OWL annotation property.
-build/pr-exact-synonyms.tsv: build/pr.owl | build
-	rapper $< \
-	| grep '^<http://purl.obolibrary.org/obo/PR_0' \
+build/pr-exact-synonyms.tsv: build/pr.nt | build
+	grep '^<http://purl.obolibrary.org/obo/PR_0' $< \
 	| grep '> <http://www.geneontology.org/formats/oboInOwl#hasExactSynonym> "' \
 	| sed 's/^<\(.*\)> <.*> "\(.*\)".*$$/\1	\2/' \
 	> $@
 
+build/pr-pro-short-labels.tsv: src/find-pro-short-labels.py build/pr.nt | build
+	$^ > $@
 
 ### Cell Ontology
 #
@@ -89,6 +92,23 @@ build/pr-exact-synonyms.tsv: build/pr.owl | build
 build/cl.owl: | build
 	curl -k -L -o $@ "http://purl.obolibrary.org/obo/cl.owl"
 
+build/cl.nt: build/cl.owl | build
+	rapper $< > $@
+
+# Extract a table of rdfs:label for CL terms.
+build/cl-labels.tsv: build/cl.nt | build
+	grep '^<http://purl.obolibrary.org/obo/CL_0' $< \
+	| grep '> <http://www.w3.org/2000/01/rdf-schema#label> "' \
+	| sed 's/^<\(.*\)> <.*> "\(.*\)".*$$/\1	\2/' \
+	> $@
+
+# Extract a table of oio:hasExactSynonyms for CL terms.
+build/cl-exact-synonyms.tsv: build/cl.nt | build
+	grep '^<http://purl.obolibrary.org/obo/CL_0' $< \
+	| grep '> <http://www.geneontology.org/formats/oboInOwl#hasExactSynonym> "' \
+	| sed 's/^<\(.*\)> <.*> "\(.*\)".*$$/\1	\2/' \
+	> $@
+
 
 ### Processing
 #
@@ -96,7 +116,11 @@ build/cl.owl: | build
 # See the script files for more documentation.
 
 # Normalize the cell population strings across studies
-build/normalized.tsv: src/normalize.py build/excluded-experiments.tsv build/value-scale.tsv source.tsv | build
+build/normalized.tsv: src/normalize.py build/excluded-experiments.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv source.tsv | build
+	$^ $@
+
+# Map gate labels to IDs and report results
+build/report2.tsv: src/report2.py build/normalized.tsv build/pr-labels.tsv build/pr-pro-short-labels.tsv build/pr-exact-synonyms.tsv build/special-gates.tsv
 	$^ $@
 
 # Build a list of ontology IDs and labels that we can recognize
