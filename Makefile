@@ -63,6 +63,7 @@ build/excluded-experiments.tsv: | build
 build/pr.owl: | build
 	curl -k -L -o $@ "http://purl.obolibrary.org/obo/pr.owl"
 
+# Use rapper to generate a file consisting of N-triples from pr.owl
 build/pr.nt: build/pr.owl | build
 	rapper $< > $@
 
@@ -74,15 +75,16 @@ build/pr-labels.tsv: build/pr.nt | build
 	> $@
 
 # Extract a table of oio:hasExactSynonyms for (proper) PR terms.
-# We want the "PRO-short-label" but unfortunately that's in an OWL annotation property.
 build/pr-exact-synonyms.tsv: build/pr.nt | build
 	grep '^<http://purl.obolibrary.org/obo/PR_0' $< \
 	| grep '> <http://www.geneontology.org/formats/oboInOwl#hasExactSynonym> "' \
 	| sed 's/^<\(.*\)> <.*> "\(.*\)".*$$/\1	\2/' \
 	> $@
 
+# Extract a table of pr#PRO-short-label labels for (proper) PR terms.
 build/pr-pro-short-labels.tsv: src/find-pro-short-labels.py build/pr.nt | build
 	$^ > $@
+
 
 ### Cell Ontology
 #
