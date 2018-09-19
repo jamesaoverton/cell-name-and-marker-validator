@@ -13,7 +13,7 @@
 # - GNU Make <https://www.gnu.org/software/make/>
 # - standard Unix tools: cURL, grep, sed, cut
 # - Python 3
-#   - pytest (https://pytest.org> for running automated tests
+#   - pytest-3 (https://pytest.org> for running automated tests
 # - rapper <http://librdf.org/raptor/rapper.html>
 
 
@@ -150,7 +150,7 @@ all: build/summary.tsv
 
 # Run automated tests
 test:
-	pytest src/*
+	pytest-3 src/*
 
 # Remove spreadsheets, keep big PRO OWL file
 .PHONY: clean

@@ -41,7 +41,7 @@ def get_unmatched_gates_rows(all_gates, matched_gates):
 
 
 def main():
-  parser = argparse.ArgumentParser(description='Find matching gates')
+  parser = argparse.ArgumentParser(description='Determine which normalized gates have gate mappings')
   parser.add_argument('recognized', type=argparse.FileType('r'),
                       help='a TSV file with ID and synonym for recognized gates')
   parser.add_argument('normalized', type=argparse.FileType('r'),

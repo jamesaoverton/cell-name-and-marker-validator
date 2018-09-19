@@ -509,18 +509,18 @@ def test_normalize():
   preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
                                       suffixsymbs.values())
   assert ontologized == ['PR:004', 'PR:025', 'PR:016+', 'PR:017++', 'PR:024++', 'PR:036++',
-                        'PR:026+']
+                         'PR:026+']
   assert preferized == ['pref004', 'pref025', 'pref016+', 'pref017++', 'pref024++', 'pref036++',
                         'pref026+']
 
   reported = 'lymphocytes/singlets/live/CD19-CD14-/CD3+/CD8+/CD69+IFNg+IL2+TNFa+'
   tokenized = tokenize('New York Influenza', suffixsymbs, suffixsyns, reported)
   assert tokenized == ['lymphocytes', 'singlets', 'live', 'CD19-', 'CD14-', 'CD3+', 'CD8+', 'CD69+',
-                    'IFNg+', 'IL2+', 'TNFa+']
+                       'IFNg+', 'IL2+', 'TNFa+']
   preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
                                       suffixsymbs.values())
   assert ontologized == ['PR:033', 'PR:038', 'PR:029', 'PR:008-', 'PR:006-', 'PR:013+', 'PR:022+',
-                        'PR:021+', 'PR:027+', 'PR:028+', 'PR:041+']
+                         'PR:021+', 'PR:027+', 'PR:028+', 'PR:041+']
   assert preferized == ['pref033', 'pref038', 'pref029', 'pref008-', 'pref006-', 'pref013+',
                         'pref022+', 'pref021+', 'pref027+', 'pref028+', 'pref041+']
 
