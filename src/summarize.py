@@ -7,35 +7,38 @@ import re
 from collections import defaultdict
 
 
-def fill_in_data_for_centers(centers, report_row):
+def get_centers_info(report_rows):
   """
   Fill in the data for the various centers based on the given row from the report
   Get the center name described by the current row
   """
-  this_center_name = report_row['NAME']
-  gates = re.split(';\s+', report_row['Gating mapped to ontologies'])
-  # `perfect` indicates that all of the gates correspond to known ontology ids. Those that
-  # aren't are prefixed with a '!'. Set it to true to begin with.
-  perfect = True
-  for gate in gates:
-    # Augment the total number of gates for this center and also for centers in general.
-    centers[this_center_name]['TOTAL_GATES'] += 1
-    centers['TOTAL']['TOTAL_GATES'] += 1
-    if gate.startswith('!'):
-      perfect = False
-    else:
-      # If the gate corresponds to a known ontology id, augment the total number of matched gates
-      # for this center and also for centers in general:
-      centers[this_center_name]['MATCHED_GATES'] += 1
-      centers['TOTAL']['MATCHED_GATES'] += 1
-  # Augment the total number of populations found for this center and also for centers in general:
-  centers[this_center_name]['TOTAL_POPULATIONS'] += 1
-  centers['TOTAL']['TOTAL_POPULATIONS'] += 1
-  if perfect:
-    # If all of the gates correspond to known ontology ids, then we can say that the population as a
-    # whole that is given in the row is a match, and we can augment the counters accordingly:
-    centers[this_center_name]['MATCHED_POPULATIONS'] += 1
-    centers['TOTAL']['MATCHED_POPULATIONS'] += 1
+  centers = defaultdict(lambda: defaultdict(int))
+  for row in report_rows:
+    this_center_name = row['NAME']
+    gates = re.split(';\s+', row['Gating mapped to ontologies'])
+    # `perfect` indicates that all of the gates correspond to known ontology ids. Those that
+    # aren't are prefixed with a '!'. Set it to true to begin with.
+    perfect = True
+    for gate in gates:
+      # Augment the total number of gates for this center and also for centers in general.
+      centers[this_center_name]['TOTAL_GATES'] += 1
+      centers['TOTAL']['TOTAL_GATES'] += 1
+      if gate.startswith('!'):
+        perfect = False
+      else:
+        # If the gate corresponds to a known ontology id, augment the total number of matched gates
+        # for this center and also for centers in general:
+        centers[this_center_name]['MATCHED_GATES'] += 1
+        centers['TOTAL']['MATCHED_GATES'] += 1
+    # Augment the total number of populations found for this center and also for centers in general:
+    centers[this_center_name]['TOTAL_POPULATIONS'] += 1
+    centers['TOTAL']['TOTAL_POPULATIONS'] += 1
+    if perfect:
+      # If all of the gates correspond to known ontology ids, then we can say that the population as
+      # a whole that is given in the row is a match, and we can augment the counters accordingly:
+      centers[this_center_name]['MATCHED_POPULATIONS'] += 1
+      centers['TOTAL']['MATCHED_POPULATIONS'] += 1
+  return centers
 
 
 def generate_centers_rows(centers, columns):
@@ -69,10 +72,8 @@ def main():
   parser.add_argument('output', type=str, help='the output TSV file')
   args = parser.parse_args()
 
-  centers = defaultdict(lambda: defaultdict(int))
   report_rows = csv.DictReader(args.report, delimiter='\t')
-  for report_row in report_rows:
-    fill_in_data_for_centers(centers, report_row)
+  centers = get_centers_info(report_rows)
 
   with open(args.output, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
@@ -104,8 +105,7 @@ def test_summarize():
     'TOTAL_GATES': '6',
   }]
 
-  for row in report_rows:
-    fill_in_data_for_centers(centers, row)
+  centers = get_centers_info(report_rows)
 
   assert centers == {
     'Center for Human Immunology, Autoimmunity and  Inflammation': {

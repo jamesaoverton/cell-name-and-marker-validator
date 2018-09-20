@@ -6,6 +6,11 @@ import re
 
 
 def generate_report_row(row):
+  """
+  For a given row from the normalized tsv file, extract the normalized column, and count the
+  number of gates in the column that are not prefixed with '!'. Gates so prefixed do not correspond
+  to any known ontology ids.
+  """
   normalized = row['Gating mapped to ontologies']
   if not normalized:
     return None
