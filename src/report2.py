@@ -85,7 +85,7 @@ def main():
       short = None
       label = None
 
-      if marker in ilabel_iris:
+      if marker.lower() in ilabel_iris:
         match_type = 'label'
         matches = ilabel_iris[marker.lower()]
 
