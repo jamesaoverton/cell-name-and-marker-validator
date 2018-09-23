@@ -7,13 +7,17 @@ import re
 from collections import defaultdict
 
 
-def get_gates_from_normalized_row(normalized_row, all_gates):
-  # Split up the given normalized_row into gates and add them all to all_gates
-  if normalized_row:
-    gates = re.split(';\s+', normalized_row)
-    for gate in gates:
-      gate = gate.rstrip('-+~')
-      all_gates[gate] += 1
+def get_gates_from_normalized_rows(normalized_rows):
+  all_gates = defaultdict(int)
+  for row in normalized_rows:
+    ontrow = row['Gating mapped to ontologies']
+    # Split up the given ontrow into gates and add them all to all_gates
+    if ontrow:
+      gates = re.split(';\s+', ontrow)
+      for gate in gates:
+        gate = gate.rstrip('-+~')
+        all_gates[gate] += 1
+  return all_gates
 
 
 def find_recognized_gate(row, all_gates, matched_gates):
@@ -41,7 +45,7 @@ def get_unmatched_gates_rows(all_gates, matched_gates):
 
 
 def main():
-  parser = argparse.ArgumentParser(description='Determine which normalized gates have gate mappings')
+  parser = argparse.ArgumentParser(description='Find normalized gates that have gate mappings')
   parser.add_argument('recognized', type=argparse.FileType('r'),
                       help='a TSV file with ID and synonym for recognized gates')
   parser.add_argument('normalized', type=argparse.FileType('r'),
@@ -49,21 +53,18 @@ def main():
   parser.add_argument('gates', type=str, help='the output table of IDs and gates')
   args = parser.parse_args()
 
-  all_gates = defaultdict(int)
-  matched_gates = set()
-
   with open(args.gates, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
     w.writerow(['Ontology ID', 'Gate', 'Count'])
 
     # First add all of the normalized gates to `all_gates`
     norm_rows = csv.DictReader(args.normalized, delimiter='\t')
-    for norm_row in norm_rows:
-      get_gates_from_normalized_row(norm_row['Gating mapped to ontologies'], all_gates)
+    all_gates = get_gates_from_normalized_rows(norm_rows)
 
     # Now read in all of the mappings of ontology ids to recognized gates.
     recgate_maps = csv.reader(args.recognized, delimiter='\t')
 
+    matched_gates = set()
     for recgate_map in recgate_maps:
       # For each mapping, check if the mapped gate is in `all_gates`. If it is, then add it to
       # `matched_gates`, and write it to the output file.
