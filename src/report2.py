@@ -144,22 +144,23 @@ def main():
   parser.add_argument('output', type=str, help='the output TSV file')
   args = parser.parse_args()
 
+  # Pull all the markers (tokenized gates stripped of their suffixes) from the normalized file
   normalized_rows = csv.DictReader(args.normalized, delimiter='\t')
   markers = get_markers(normalized_rows)
 
-  # Read the labels file and get the maps from IRIs to labels and vice versa
+  # Read the labels file to construct maps from IRIs to labels and vice versa
   label_rows = csv.reader(args.labels, delimiter='\t')
   ilabel_iris, iri_labels = get_iri_label_maps(label_rows)
 
-  # Read the shorts file and get the maps from IRIs to short labels and vice versa
+  # Read the shorts file to construct maps from IRIs to short labels and vice versa
   short_rows = csv.reader(args.shorts, delimiter='\t')
   ishort_iris, iri_shorts = get_iri_short_label_maps(short_rows)
 
-  # Read the exact labels file and get the maps from IRIs to exact labels and vice versa
+  # Read the exact labels file to construct maps from IRIs to exact labels and vice versa
   exact_rows = csv.reader(args.exacts, delimiter='\t')
   iexact_iris = get_iri_exact_label_maps(exact_rows, ishort_iris)
 
-  # Read the special labels file and get the maps from IRIs to special labels and vice versa
+  # Read the special labels file to construct maps from IRIs to special labels and vice versa
   special_rows = csv.DictReader(args.specials, delimiter='\t')
   ispecial_iris, iri_specials = get_iri_special_label_maps(special_rows)
 
@@ -179,4 +180,136 @@ if __name__ == "__main__":
 
 
 def test_report2():
-  pass
+  normalized_rows = [
+    {'EXPERIMENT_ACCESSION': 'EXP13892',
+     'Gating tokenized': ('Intact_cells; intact_singlets; viable_singlets; CD14-; CD33-; CD3+; '
+                          'CD4+; CD8-; Non-naive_CD4+; CXCR5+'),
+     'NAME': 'HIPC Stanford Project',
+     'Gating preferred labels': ('!Intact_cells; intact_singlets; !viable_singlets; CD14-; CD33-; '
+                                 '!CD3+; CD4+; !CD8-; !Non-naive_CD4+; CXCR5+'),
+     'POPULATION_DEFNITION_REPORTED': ('Intact cells/intact singlets/viable singlets/CD14-CD33-'
+                                       '/CD3+/CD4+CD8-/Non-naive CD4+/CXCR5+'),
+     'Gating mapped to ontologies': ('!Intact_cells; intact_singlets; !viable_singlets; '
+                                     'PR:000001889-; PR:000001892-; !CD3+; PR:000001004+; !CD8-; '
+                                     '!Non-naive_CD4+; PR:000001209+'),
+     'POPULATION_NAME_REPORTED': 'TFH CD4+ T cells',
+     'STUDY_ACCESSION': 'SDY478'}
+  ]
+
+  markers = get_markers(normalized_rows)
+  assert markers == {'Intact_cells': 1, 'Non-naive_CD4': 1, 'CD33': 1, 'intact_singlets': 1,
+                     'CD4': 1, 'CD14': 1, 'CXCR5': 1, 'CD3': 1, 'CD8': 1, 'viable_singlets': 1}
+
+  label_rows = [
+    ['http://purl.obolibrary.org/obo/PR_000001892', 'CD33 molecule'],
+    ['http://purl.obolibrary.org/obo/PR_000046634', 'myeloid CD33, signal (human)'],
+    ['http://purl.obolibrary.org/obo/PR_000003070', 'CD4 molecule isoform 1 unmodified form'],
+    ['http://purl.obolibrary.org/obo/PR_000003071', 'CD4 molecule isoform 1 phosphorylated form'],
+    ['http://purl.obolibrary.org/obo/PR_000003072', 'CD4 molecule isoform 1 phosphorylated 1'],
+    ['http://purl.obolibrary.org/obo/PR_000018303', 'obsolete CD4 molecule, full-length form'],
+    ['http://purl.obolibrary.org/obo/PR_000018304', 'CD4 molecule, signal peptide removed form'],
+  ]
+
+  ilabel_iris, iri_labels = get_iri_label_maps(label_rows)
+
+  assert ilabel_iris == {
+    'cd33 molecule': ['http://purl.obolibrary.org/obo/PR_000001892'],
+    'myeloid cd33, signal (human)': ['http://purl.obolibrary.org/obo/PR_000046634'],
+    'cd4 molecule isoform 1 unmodified form': ['http://purl.obolibrary.org/obo/PR_000003070'],
+    'cd4 molecule isoform 1 phosphorylated form': ['http://purl.obolibrary.org/obo/PR_000003071'],
+    'cd4 molecule isoform 1 phosphorylated 1': ['http://purl.obolibrary.org/obo/PR_000003072'],
+    'obsolete cd4 molecule, full-length form': ['http://purl.obolibrary.org/obo/PR_000018303'],
+    'cd4 molecule, signal peptide removed form': ['http://purl.obolibrary.org/obo/PR_000018304'],
+  }
+
+  assert iri_labels == {
+    'http://purl.obolibrary.org/obo/PR_000001892': 'CD33 molecule',
+    'http://purl.obolibrary.org/obo/PR_000046634': 'myeloid CD33, signal (human)',
+    'http://purl.obolibrary.org/obo/PR_000003070': 'CD4 molecule isoform 1 unmodified form',
+    'http://purl.obolibrary.org/obo/PR_000003071': 'CD4 molecule isoform 1 phosphorylated form',
+    'http://purl.obolibrary.org/obo/PR_000003072': 'CD4 molecule isoform 1 phosphorylated 1',
+    'http://purl.obolibrary.org/obo/PR_000018303': 'obsolete CD4 molecule, full-length form',
+    'http://purl.obolibrary.org/obo/PR_000018304': 'CD4 molecule, signal peptide removed form',
+  }
+
+  short_rows = [
+    ['http://purl.obolibrary.org/obo/PR_000001892', 'CD33'],
+    ['http://purl.obolibrary.org/obo/PR_000001893', 'CD33'],
+    ['http://purl.obolibrary.org/obo/PR_000001004', 'CD4'],
+  ]
+
+  ishort_iris, iri_shorts = get_iri_short_label_maps(short_rows)
+
+  assert ishort_iris == {
+    'cd4': ['http://purl.obolibrary.org/obo/PR_000001004'],
+    'cd33': ['http://purl.obolibrary.org/obo/PR_000001892',
+             'http://purl.obolibrary.org/obo/PR_000001893']
+  }
+
+  assert iri_shorts == {
+    'http://purl.obolibrary.org/obo/PR_000001004': 'CD4',
+    'http://purl.obolibrary.org/obo/PR_000001892': 'CD33',
+    'http://purl.obolibrary.org/obo/PR_000001893': 'CD33',
+  }
+
+  exact_rows = [
+    ['http://purl.obolibrary.org/obo/PR_000001892', 'CD33'],
+    ['http://purl.obolibrary.org/obo/PR_000001892', 'myeloid cell surface antigen CD33'],
+    ['http://purl.obolibrary.org/obo/PR_000001927', 'CD33 antigen-like 2'],
+    ['http://purl.obolibrary.org/obo/PR_000001928', 'CD33 antigen-like 1'],
+    ['http://purl.obolibrary.org/obo/PR_000014868', 'CD33 antigen-like 3'],
+  ]
+
+  iexact_iris = get_iri_exact_label_maps(exact_rows, ishort_iris)
+
+  assert iexact_iris == {
+    'myeloid cell surface antigen cd33': ['http://purl.obolibrary.org/obo/PR_000001892'],
+    'cd33 antigen-like 2': ['http://purl.obolibrary.org/obo/PR_000001927'],
+    'cd33 antigen-like 1': ['http://purl.obolibrary.org/obo/PR_000001928'],
+    'cd33 antigen-like 3': ['http://purl.obolibrary.org/obo/PR_000014868'],
+  }
+
+  special_rows = [
+    {'Label': 'intact_cells', 'Valid': 'TRUE', 'Type': 'cell type, scatter', 'toxic synonym': '',
+     'comment': '', 'Synonyms': 'intact_cells_population', 'Ontology ID': 'intact_cells'},
+    {'Label': 'intact_singlets', 'Valid': 'TRUE', 'Type': 'cell type, scatter', 'toxic synonym': '',
+     'comment': '', 'Synonyms': '', 'Ontology ID': 'intact_singlets'},
+    {'Label': 'singlets', 'Valid': 'TRUE', 'Type': 'cell type, scatter', 'toxic synonym': 'WBC/2-',
+     'comment': '', 'Synonyms': 'sing, singlet, doublet_excluded, sing-F',
+     'Ontology ID': 'singlets'},
+  ]
+
+  ispecial_iris, iri_specials = get_iri_special_label_maps(special_rows)
+
+  assert ispecial_iris == {'': ['intact_singlets'],
+                           'intact_cells': ['intact_cells'],
+                           'intact_cells_population': ['intact_cells'],
+                           'singlets': ['singlets'],
+                           'sing-f': ['singlets'],
+                           'intact_singlets': ['intact_singlets'],
+                           'doublet_excluded': ['singlets'],
+                           'singlet': ['singlets'],
+                           'sing': ['singlets']}
+
+  assert iri_specials == {'singlets': 'singlets',
+                          'intact_cells': 'intact_cells',
+                          'intact_singlets': 'intact_singlets'}
+
+  rows = generate_report_rows(markers, ilabel_iris, iri_labels, ishort_iris, iri_shorts,
+                              iexact_iris, ispecial_iris, iri_specials)
+
+  assert rows == [
+    ['CD14', 1, None, None, None, None, None],
+    ['CD3', 1, None, None, None, None, None],
+    ['CD33', 1, 'TRUE', 'PRO short label',
+     'http://purl.obolibrary.org/obo/PR_000001892 http://purl.obolibrary.org/obo/PR_000001893',
+     None, None],
+    ['CD4', 1, None, 'PRO short label', 'http://purl.obolibrary.org/obo/PR_000001004',
+     'CD4', None],
+    ['CD8', 1, None, None, None, None, None],
+    ['CXCR5', 1, None, None, None, None, None],
+    ['Intact_cells', 1, None, 'special', 'intact_cells', None, 'intact_cells'],
+    ['intact_singlets', 1, None, 'special', 'intact_singlets', None, 'intact_singlets'],
+    ['Non-naive_CD4', 1, None, None, None, None, None],
+    ['viable_singlets', 1, None, None, None, None, None]
+  ]
