@@ -108,7 +108,7 @@ def generate_report_rows(markers, ilabel_iris, iri_labels, ishort_iris, iri_shor
     elif marker.lower() in ishort_iris:
       match_type = 'PRO short label'
       matches = ishort_iris[marker.lower()]
-    elif marker in ilabel_iris:
+    elif marker.lower() in ilabel_iris:
       match_type = 'label'
       matches = ilabel_iris[marker.lower()]
     elif marker.lower() in iexact_iris:
