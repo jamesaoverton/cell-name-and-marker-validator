@@ -86,9 +86,11 @@ def test_find_gates():
   all_gates = defaultdict(int)
   matched_gates = set()
 
-  normalized = 'alternate_ontid+; PR:000001002+; PR:000001289+; !IgD-; PR:000001963+; PR:000001412+'
+  normalized = [
+    {'Gating mapped to ontologies':
+     'alternate_ontid+; PR:000001002+; PR:000001289+; !IgD-; PR:000001963+; PR:000001412+'}]
 
-  get_gates_from_normalized_row(normalized, all_gates)
+  all_gates = get_gates_from_normalized_rows(normalized)
   assert all_gates == {'alternate_ontid': 1, 'PR:000001002': 1, 'PR:000001289': 1, '!IgD': 1,
                        'PR:000001963': 1, 'PR:000001412': 1}
 

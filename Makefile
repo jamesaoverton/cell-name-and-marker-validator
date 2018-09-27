@@ -122,23 +122,23 @@ build/normalized.tsv: src/normalize.py build/excluded-experiments.tsv build/valu
 	$^ $@
 
 # Map gate labels to IDs and report results
-build/report2.tsv: src/report2.py build/normalized.tsv build/pr-labels.tsv build/pr-pro-short-labels.tsv build/pr-exact-synonyms.tsv build/special-gates.tsv
+build/report2.tsv: src/report2.py build/normalized.tsv build/pr-labels.tsv build/pr-pro-short-labels.tsv build/pr-exact-synonyms.tsv build/special-gates.tsv | build
 	$^ $@
 
 # Build a list of ontology IDs and labels that we can recognize
-build/gate-mappings.tsv: build/special-gates.tsv build/pr-exact-synonyms.tsv
+build/gate-mappings.tsv: build/special-gates.tsv build/pr-exact-synonyms.tsv | build
 	cat $^ | cut -f 1-2 > $@
 
 # Generate a list of all gate labels that are used
-build/gates.tsv: src/find-gates.py build/gate-mappings.tsv build/normalized.tsv
+build/gates.tsv: src/find-gates.py build/gate-mappings.tsv build/normalized.tsv | build
 	$^ $@
 
 # Map gate labels to IDs and report results
-build/report.tsv: src/report.py build/normalized.tsv build/gates.tsv
+build/report.tsv: src/report.py build/normalized.tsv build/gates.tsv | build
 	$^ $@
 
 # Build a table summarizing mapping success by centre
-build/summary.tsv: src/summarize.py build/report.tsv
+build/summary.tsv: src/summarize.py build/report.tsv | build
 	$^ $@
 
 
@@ -146,7 +146,11 @@ build/summary.tsv: src/summarize.py build/report.tsv
 
 # Run all the important tasks
 .PHONY: all
-all: build/summary.tsv
+all: build/summary.tsv | build
+
+# Run all the tasks required to run the server
+.PHONY: server
+server: build/pr-labels.tsv build/cl.owl build/value-scale.tsv build/special-gates.tsv build/pr-exact-synonyms.tsv | build
 
 # Run automated tests
 test:

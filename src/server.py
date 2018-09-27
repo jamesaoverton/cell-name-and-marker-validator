@@ -2,14 +2,21 @@
 #
 # Use [Flask](http://flask.pocoo.org) to serve a validation page.
 
-import copy, csv, re
+import copy
+import csv
+import re
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from flask import Flask, request, render_template, redirect, url_for
+from os import path
+
+from common import extract_suffix_syns_symbs, extract_iri_special_label_maps
+
+
+pwd = path.dirname(path.realpath(__file__))
+
 app = Flask(__name__)
 
-symbols = {}
-suffixes = OrderedDict()
 synonym_iris = {}
 
 iri_labels = {
@@ -62,9 +69,9 @@ def decorate_gate(kind, level):
   return gate
 
 def process_gate(gate_string):
-  for suffix in suffixes.keys():
+  for suffix in suffixsyns.keys():
     if gate_string.endswith(suffix):
-      gate_string = re.sub('\s*' + re.escape(suffix) + '$', symbols[suffixes[suffix]], gate_string)
+      gate_string = re.sub('\s*' + re.escape(suffix) + '$', suffixsymbs[suffixsyns[suffix]], gate_string)
       continue
 
   kind_name = gate_string.rstrip('+-~')
@@ -177,36 +184,24 @@ def my_app():
       gate_errors=gate_errors,
       conflicts=conflicts)
 
-if __name__ == '__main__':
-  with open('build/value-scale.tsv') as f:
-    rows = csv.DictReader(f, delimiter='\t')
-    for row in rows:
-      symbols[row['Name']] = row['Symbol']
-      suffixes[row['Name']] = row['Name']
-      for synonym in row['Synonyms'].split(','):
-        synonym = synonym.strip()
-        if synonym != '':
-          suffixes[synonym] = row['Name']
 
-  # Read special gates
-  with open('build/special-gates.tsv') as f:
+if __name__ == '__main__':
+  # Read suffix symbols and suffix synonyms:
+  with open(pwd + '/../build/value-scale.tsv') as f:
     rows = csv.DictReader(f, delimiter='\t')
-    for row in rows:
-      iri = row['Ontology ID']
-      label = row['Label']
-      synonyms = row['Synonyms']
-      if iri:
-        iri = re.sub('PR:', 'http://purl.obolibrary.org/obo/PR_', iri)
-      if iri and label:
-        iri_labels[iri] = label
-        synonym_iris[label] = iri
-      for synonym in synonyms.split(','):
-        synonym = synonym.strip()
-        if iri:
-          synonym_iris[synonym] = iri
+    suffixsymbs, suffixsyns = extract_suffix_syns_symbs(rows)
+
+  # Read special gates:
+  with open(pwd + '/../build/special-gates.tsv') as f:
+    rows = csv.DictReader(f, delimiter='\t')
+    ispecial_iris, iri_specials = extract_iri_special_label_maps(rows)
+    iri_labels.update(iri_specials)
+    # ispecial_iris maps special labels to lists of iris, so flatten the lists here:
+    for key in ispecial_iris:
+      synonym_iris.update({'{}'.format(key): '{}'.format(','.join(ispecial_iris[key]))})
 
   # Read PR labels
-  with open('build/pr-labels.tsv') as f:
+  with open(pwd + '/../build/pr-labels.tsv') as f:
     rows = csv.reader(f, delimiter='\t')
     for row in rows:
       iri = row[0]
@@ -216,7 +211,7 @@ if __name__ == '__main__':
         synonym_iris[label] = iri
 
   # Read PR synonyms
-  with open('build/pr-exact-synonyms.tsv') as f:
+  with open(pwd + '/../build/pr-exact-synonyms.tsv') as f:
     rows = csv.reader(f, delimiter='\t')
     for row in rows:
       iri = row[0]
@@ -233,7 +228,7 @@ if __name__ == '__main__':
     'obo': 'http://purl.obolibrary.org/obo/',
     'oboInOwl': 'http://www.geneontology.org/formats/oboInOwl#'
   }
-  tree = ET.parse('build/cl.owl')
+  tree = ET.parse(pwd + '/../build/cl.owl')
   root = tree.getroot()
   obo = 'http://purl.obolibrary.org/obo/'
   rdf_about = '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about'
