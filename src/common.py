@@ -16,7 +16,7 @@ def extract_suffix_syns_symbs(rows):
     return suffixsymbs, suffixsyns
 
 
-def extract_iri_special_label_maps(rows):
+def get_iri_special_label_maps(rows):
     # This maps special labels to lists of IRIs
     ispecial_iris = defaultdict(list)
     # This maps IRIs to special labels:
@@ -33,3 +33,19 @@ def extract_iri_special_label_maps(rows):
             ispecial_iris[synonym.lower()].append(iri)
 
     return ispecial_iris, iri_specials
+
+
+def get_iri_label_maps(label_rows):
+  # This maps labels to lists of IRIs:
+  ilabel_iris = defaultdict(list)
+  # This maps IRIs to labels
+  iri_labels = {}
+
+  for row in label_rows:
+    (iri, label) = row
+    # Add the IRI to the list of IRIs associated with the label in the ilabel_iris dictionary
+    ilabel_iris[label.lower()].append(iri)
+    # Map the IRI to the label in the iri_labels dictionary
+    iri_labels[iri] = label
+
+  return ilabel_iris, iri_labels

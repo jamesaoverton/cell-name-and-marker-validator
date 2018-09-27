@@ -10,7 +10,7 @@ from collections import OrderedDict
 from flask import Flask, request, render_template, redirect, url_for
 from os import path
 
-from common import extract_suffix_syns_symbs, extract_iri_special_label_maps
+from common import extract_suffix_syns_symbs, get_iri_special_label_maps, get_iri_label_maps
 
 
 pwd = path.dirname(path.realpath(__file__))
@@ -186,6 +186,12 @@ def my_app():
 
 
 if __name__ == '__main__':
+  def update_maps(to_iris, from_iris):
+    iri_labels.update(from_iris)
+    # to_iris maps labels to lists of iris, so flatten the lists here:
+    for key in to_iris:
+      synonym_iris.update({'{}'.format(key): '{}'.format(','.join(to_iris[key]))})
+
   # Read suffix symbols and suffix synonyms:
   with open(pwd + '/../build/value-scale.tsv') as f:
     rows = csv.DictReader(f, delimiter='\t')
@@ -194,21 +200,14 @@ if __name__ == '__main__':
   # Read special gates:
   with open(pwd + '/../build/special-gates.tsv') as f:
     rows = csv.DictReader(f, delimiter='\t')
-    ispecial_iris, iri_specials = extract_iri_special_label_maps(rows)
-    iri_labels.update(iri_specials)
-    # ispecial_iris maps special labels to lists of iris, so flatten the lists here:
-    for key in ispecial_iris:
-      synonym_iris.update({'{}'.format(key): '{}'.format(','.join(ispecial_iris[key]))})
+    to_iris, from_iris = get_iri_special_label_maps(rows)
+    update_maps(to_iris, from_iris)
 
   # Read PR labels
   with open(pwd + '/../build/pr-labels.tsv') as f:
     rows = csv.reader(f, delimiter='\t')
-    for row in rows:
-      iri = row[0]
-      label = row[1]
-      if iri and label:
-        iri_labels[iri] = label
-        synonym_iris[label] = iri
+    to_iris, from_iris = get_iri_label_maps(rows)
+    update_maps(to_iris, from_iris)
 
   # Read PR synonyms
   with open(pwd + '/../build/pr-exact-synonyms.tsv') as f:

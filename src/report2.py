@@ -5,7 +5,7 @@ import csv
 import re
 
 from collections import defaultdict # maybe eventually remove this import
-from common import extract_iri_special_label_maps
+from common import get_iri_special_label_maps, get_iri_label_maps
 
 
 def get_markers(normalized_rows):
@@ -23,22 +23,6 @@ def get_markers(normalized_rows):
         markers[marker] += 1
 
   return markers
-
-
-def get_iri_label_maps(label_rows):
-  # This maps labels to lists of IRIs:
-  ilabel_iris = defaultdict(list)
-  # This maps IRIs to labels
-  iri_labels = {}
-
-  for row in label_rows:
-    (iri, label) = row
-    # Add the IRI to the list of IRIs associated with the label in the ilabel_iris dictionary
-    ilabel_iris[label.lower()].append(iri)
-    # Map the IRI to the label in the iri_labels dictionary
-    iri_labels[iri] = label
-
-  return ilabel_iris, iri_labels
 
 
 def get_iri_short_label_maps(short_rows):
@@ -144,7 +128,7 @@ def main():
 
   # Read the special labels file to construct maps from IRIs to special labels and vice versa
   special_rows = csv.DictReader(args.specials, delimiter='\t')
-  ispecial_iris, iri_specials = extract_iri_special_label_maps(special_rows)
+  ispecial_iris, iri_specials = get_iri_special_label_maps(special_rows)
 
   with open(args.output, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
@@ -261,7 +245,7 @@ def test_report2():
      'Ontology ID': 'singlets'},
   ]
 
-  ispecial_iris, iri_specials = extract_iri_special_label_maps(special_rows)
+  ispecial_iris, iri_specials = get_iri_special_label_maps(special_rows)
 
   assert ispecial_iris == {'': ['intact_singlets'],
                            'intact_cells': ['intact_cells'],
