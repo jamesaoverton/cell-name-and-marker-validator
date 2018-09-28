@@ -15,11 +15,19 @@ from common import (extract_suffix_syns_symbs, get_iri_special_label_maps, get_i
 
 
 pwd = path.dirname(path.realpath(__file__))
-
 app = Flask(__name__)
 
+# Global dictionaries
+
+# dict mapping suffix names to their symbolic suffix representation:
+suffixsymbs = {}
+# OrderedDict mapping suffix synonyms to their standardised suffix name:
+suffixsyns = OrderedDict()
+
+# Maps label synonyms to IRIs
 synonym_iris = {}
 
+# Maps IRIs to labels
 iri_labels = {
   'http://purl.obolibrary.org/obo/RO_0002104': 'has plasma membrane part',
   'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part': 'lacks plasma membrane part',
@@ -100,11 +108,17 @@ def process_gate(gate_string):
 
 @app.route('/', methods=['GET'])
 def my_app():
+  # NOT SURE WHAT THE PURPOSE OF THIS IS:
   if 'gate' in request.args:
     special_gate = request.args['gate'].strip()
     return render_template('/gate.html', special_gate=special_gate)
 
+  # cells_field holds cell population names from the cell ontology database; if not specified, it's
+  # initialised to the following default value:
   cells_field = 'CD4-positive, alpha-beta T cell & CD19-'
+
+  # If the request specifies the 'cells' field, parse it into a cell name and (optionally) a list of
+  # gates for that cell, using '&' as our separator. Then process each gate in the list
   if 'cells' in request.args:
     cells_field = request.args['cells'].strip()
   cell_gates = []
@@ -112,6 +126,7 @@ def my_app():
     cells_fields = cells_field.split('&', maxsplit=1)
     cell_name = cells_fields[0].strip()
     cell_gating = cells_fields[1].strip()
+    # Gates are assumed to be separated by semicolons
     gate_strings = re.split(r';\s*', cell_gating)
     for gate_string in gate_strings:
       gate = process_gate(gate_string)
@@ -119,52 +134,62 @@ def my_app():
   else:
     cell_name = cells_field
 
+  # gates_field holds gate names from the protein ontology database; if not specified, it gets
+  # initialised to the following default value, otherwise get it from the request.
   gates_field = 'CD4-; CD19+; CD20-; CD27++; CD38+-; infected[Dengue virus]; CD56[glycosylated]+'
   if 'gates' in request.args:
     gates_field = request.args['gates'].strip()
 
-  cell_results = []
-  gate_results = []
-  conflicts = []
-
-  # Submit a: label, synonym, ID, or IRI
-  cell_iri = None
+  # Find the IRI for the cell based on cell_name, which can be a: label/synonym, ID, or IRI.
   if cell_name in synonym_iris:
     cell_iri = synonym_iris[cell_name]
   elif cell_name in iri_labels:
     cell_iri = cell_name
   else:
     iri = re.sub('^CL:', 'http://purl.obolibrary.org/obo/CL_', cell_name)
-    if iri in iri_labels:
-      cell_iri = iri
+    cell_iri = iri if iri in iri_labels else None
 
-  cell = {
-    'recognized': False,
-    'conflicts': False,
-    'has_cell_gates': len(cell_gates) > 0,
-    'cell_gates': cell_gates
-  }
+  cell_results = []
+  # Initialise a dictionary which will contain information about this cell
+  cell = {'recognized': False, 'conflicts': False, 'has_cell_gates': len(cell_gates) > 0,
+          'cell_gates': cell_gates}
   if cell_iri in iri_gates:
+    # If the cell IRI is in the IRI->Gates map, then add its IRI and flag it as recognised.
     cell['recognized'] = True
     cell['iri'] = cell_iri
     if cell_iri in iri_labels:
+      # If the cell is in the IRI->Labels map, then add its label
       cell['label'] = iri_labels[cell_iri]
     if cell_iri in iri_parents:
+      # It it is in the IRI->Parents map, then add its parent's IRI
       cell['parent'] = iri_parents[cell_iri]
       if cell['parent'] in iri_labels:
+        # If its parent's IRI is in the IRI->Labels map, then add its parent's label
         cell['parent_label'] = iri_labels[cell['parent']]
+
+    # Now for each gate associated with the cell IRI, create a dictionary with information about it
+    # and append it to cell_results
     for gate in iri_gates[cell_iri]:
       gate = decorate_gate(gate['kind'], gate['level'])
       if gate['level'] in iri_levels:
         gate['level_name'] = level_names[iri_levels[gate['level']]]
       cell_results.append(gate)
+    # Include the information from cell_gates (the gates specified in the request) to cell_results
+    # (the list of gates extracted based on the cell's IRI)
     cell_results = cell_results + cell_gates
 
+  gate_results = []
+  conflicts = []
+  # Parse gates_field (which is taken from the request). Assume gates are separated by semicolons
   gate_strings = re.split(r';\s*', gates_field)
   gate_errors = False
   for gate_string in gate_strings:
     gate = process_gate(gate_string)
 
+    # Check for any discrepancies between what has been given through the request and the gate info
+    # that has been extracted (cell_results) based on a lookup of the cell IRIs. Indicate any such
+    # in the info for the gate, and append the gate info to a list of gates with conflicts. Either
+    # way, append the gate into to the gate_results list.
     for cell_result in cell_results:
       if gate['kind'] == cell_result['kind'] and gate['level'] != cell_result['level']:
         gate['conflict'] = True
@@ -176,6 +201,7 @@ def my_app():
         conflicts.append(conflict)
     gate_results.append(gate)
 
+  # Serve the web page back with the generated info
   return render_template('/index.html',
       cells=cells_field,
       gates=gates_field,
@@ -187,7 +213,13 @@ def my_app():
 
 
 if __name__ == '__main__':
+  """
+  At startup, the main function reads information from files in the build directory and uses it to
+  populate our global dictionaries.
+  """
   def update_maps(to_iris={}, from_iris={}):
+    # This inner function updates the synonyms_iris map with the contents of to_iris, and the
+    # iri_labels map with the contents of from_iris.
     iri_labels.update(from_iris)
     # to_iris maps labels to lists of iris, so flatten the lists here:
     for key in to_iris:
