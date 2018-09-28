@@ -34,7 +34,7 @@ iri_labels = {
   'http://purl.obolibrary.org/obo/cl#has_high_plasma_membrane_amount': 'has high plasma membrane amount',
   'http://purl.obolibrary.org/obo/cl#has_low_plasma_membrane_amount': 'has low plasma membrane amount'
 }
- 
+
 iri_parents = {}
 
 iri_gates = {}
@@ -57,6 +57,7 @@ level_iris = {
 
 iri_levels = {v: k for k, v in level_iris.items()}
 
+
 def decorate_gate(kind, level):
   gate = {
     'kind': kind,
@@ -67,20 +68,22 @@ def decorate_gate(kind, level):
 
   if kind in iri_labels:
     gate['kind_recognized'] = True
-    gate['kind_label'] = iri_labels[kind] 
+    gate['kind_label'] = iri_labels[kind]
   if kind and not kind.startswith('http'):
     gate['kind'] = '?gate=' + kind
 
   if level in iri_labels:
     gate['level_recognized'] = True
-    gate['level_label'] = iri_labels[level] 
+    gate['level_label'] = iri_labels[level]
 
   return gate
+
 
 def process_gate(gate_string):
   for suffix in suffixsyns.keys():
     if gate_string.endswith(suffix):
-      gate_string = re.sub('\s*' + re.escape(suffix) + '$', suffixsymbs[suffixsyns[suffix]], gate_string)
+      gate_string = re.sub('\s*' + re.escape(suffix) + '$', suffixsymbs[suffixsyns[suffix]],
+                           gate_string)
       continue
 
   kind_name = gate_string.rstrip('+-~')
@@ -96,19 +99,55 @@ def process_gate(gate_string):
     level = level_iris[level_name]
   gate = {}
 
+  has_errors = False
   gate = decorate_gate(kind, level)
   if not kind:
-    gate_errors = True
+    has_errors = True
   gate['gate'] = gate_string
   gate['kind_name'] = kind_name
   gate['level_name'] = level_names[level_name]
 
-  return gate
+  return gate, has_errors
+
+
+def get_cell_info(cell_gates):
+  # Initialise a dictionary which will contain information about this cell
+  cell = {'recognized': False, 'conflicts': False, 'has_cell_gates': len(cell_gates) > 0,
+          'cell_gates': cell_gates}
+  if cell_iri in iri_gates:
+    # If the cell IRI is in the IRI->Gates map, then add its IRI and flag it as recognised.
+    cell['recognized'] = True
+    cell['iri'] = cell_iri
+    if cell_iri in iri_labels:
+      # If the cell is in the IRI->Labels map, then add its label
+      cell['label'] = iri_labels[cell_iri]
+    if cell_iri in iri_parents:
+      # It it is in the IRI->Parents map, then add its parent's IRI
+      cell['parent'] = iri_parents[cell_iri]
+      if cell['parent'] in iri_labels:
+        # If its parent's IRI is in the IRI->Labels map, then add its parent's label
+        cell['parent_label'] = iri_labels[cell['parent']]
+
+  return cell
+
+
+def get_gate_info_for_cell(cell_iri):
+  cell_results = []
+
+  if cell_iri:
+    # For each gate associated with the cell IRI, create a dictionary with information about it
+    # and append it to cell_results
+    for gate in iri_gates[cell_iri]:
+      gate = decorate_gate(gate['kind'], gate['level'])
+      if gate['level'] in iri_levels:
+        gate['level_name'] = level_names[iri_levels[gate['level']]]
+      cell_results.append(gate)
+
+  return cell_results
 
 
 @app.route('/', methods=['GET'])
 def my_app():
-  # NOT SURE WHAT THE PURPOSE OF THIS IS:
   if 'gate' in request.args:
     special_gate = request.args['gate'].strip()
     return render_template('/gate.html', special_gate=special_gate)
@@ -121,6 +160,7 @@ def my_app():
   # gates for that cell, using '&' as our separator. Then process each gate in the list
   if 'cells' in request.args:
     cells_field = request.args['cells'].strip()
+
   cell_gates = []
   if '&' in cells_field:
     cells_fields = cells_field.split('&', maxsplit=1)
@@ -149,42 +189,20 @@ def my_app():
     iri = re.sub('^CL:', 'http://purl.obolibrary.org/obo/CL_', cell_name)
     cell_iri = iri if iri in iri_labels else None
 
-  cell_results = []
-  # Initialise a dictionary which will contain information about this cell
-  cell = {'recognized': False, 'conflicts': False, 'has_cell_gates': len(cell_gates) > 0,
-          'cell_gates': cell_gates}
-  if cell_iri in iri_gates:
-    # If the cell IRI is in the IRI->Gates map, then add its IRI and flag it as recognised.
-    cell['recognized'] = True
-    cell['iri'] = cell_iri
-    if cell_iri in iri_labels:
-      # If the cell is in the IRI->Labels map, then add its label
-      cell['label'] = iri_labels[cell_iri]
-    if cell_iri in iri_parents:
-      # It it is in the IRI->Parents map, then add its parent's IRI
-      cell['parent'] = iri_parents[cell_iri]
-      if cell['parent'] in iri_labels:
-        # If its parent's IRI is in the IRI->Labels map, then add its parent's label
-        cell['parent_label'] = iri_labels[cell['parent']]
-
-    # Now for each gate associated with the cell IRI, create a dictionary with information about it
-    # and append it to cell_results
-    for gate in iri_gates[cell_iri]:
-      gate = decorate_gate(gate['kind'], gate['level'])
-      if gate['level'] in iri_levels:
-        gate['level_name'] = level_names[iri_levels[gate['level']]]
-      cell_results.append(gate)
-    # Include the information from cell_gates (the gates specified in the request) to cell_results
-    # (the list of gates extracted based on the cell's IRI)
-    cell_results = cell_results + cell_gates
+  cell = get_cell_info(cell_gates)
+  # Include the information from cell_gates (the gates specified in the request) to cell_results
+  # (the list of gates extracted based on the cell's IRI)
+  cell_results = get_gate_info_for_cell(cell.get('iri')) + cell_gates
 
   gate_results = []
   conflicts = []
+  gate_errors = False
   # Parse gates_field (which is taken from the request). Assume gates are separated by semicolons
   gate_strings = re.split(r';\s*', gates_field)
-  gate_errors = False
   for gate_string in gate_strings:
-    gate = process_gate(gate_string)
+    gate, has_errors = process_gate(gate_string)
+    if has_errors and not gate_errors:
+      gate_errors = True
 
     # Check for any discrepancies between what has been given through the request and the gate info
     # that has been extracted (cell_results) based on a lookup of the cell IRIs. Indicate any such
@@ -202,14 +220,15 @@ def my_app():
     gate_results.append(gate)
 
   # Serve the web page back with the generated info
-  return render_template('/index.html',
-      cells=cells_field,
-      gates=gates_field,
-      cell=cell,
-      cell_results=cell_results,
-      gate_results=gate_results,
-      gate_errors=gate_errors,
-      conflicts=conflicts)
+  return render_template(
+    '/index.html',
+    cells=cells_field,
+    gates=gates_field,
+    cell=cell,
+    cell_results=cell_results,
+    gate_results=gate_results,
+    gate_errors=gate_errors,
+    conflicts=conflicts)
 
 
 if __name__ == '__main__':
@@ -270,7 +289,7 @@ if __name__ == '__main__':
     iri = None
     if rdf_about in child.attrib:
       iri = child.attrib[rdf_about]
-    if iri and iri.startswith(obo + 'CL_'): # and iri == obo + 'CL_0000624':
+    if iri and iri.startswith(obo + 'CL_'):  # and iri == obo + 'CL_0000624':
       label = child.findtext(rdfs_label)
       if label:
         iri_labels[iri] = label
@@ -303,4 +322,3 @@ if __name__ == '__main__':
 
   app.debug = True
   app.run()
-
