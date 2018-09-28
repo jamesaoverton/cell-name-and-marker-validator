@@ -49,3 +49,16 @@ def get_iri_label_maps(label_rows):
     iri_labels[iri] = label
 
   return ilabel_iris, iri_labels
+
+
+def get_iri_exact_label_maps(exact_rows, ishort_iris={}):
+  # This maps exact labels to lists IRIs
+  iexact_iris = defaultdict(list)
+
+  for row in exact_rows:
+    (iri, exact) = row
+    # Only add the exact label to the map if it isn't already in the short labels dict:
+    if not exact.lower() in ishort_iris:
+      iexact_iris[exact.lower()].append(iri)
+
+  return iexact_iris

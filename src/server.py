@@ -10,7 +10,8 @@ from collections import OrderedDict
 from flask import Flask, request, render_template, redirect, url_for
 from os import path
 
-from common import extract_suffix_syns_symbs, get_iri_special_label_maps, get_iri_label_maps
+from common import (extract_suffix_syns_symbs, get_iri_special_label_maps, get_iri_label_maps,
+                    get_iri_exact_label_maps)
 
 
 pwd = path.dirname(path.realpath(__file__))
@@ -186,7 +187,7 @@ def my_app():
 
 
 if __name__ == '__main__':
-  def update_maps(to_iris, from_iris):
+  def update_maps(to_iris={}, from_iris={}):
     iri_labels.update(from_iris)
     # to_iris maps labels to lists of iris, so flatten the lists here:
     for key in to_iris:
@@ -212,11 +213,8 @@ if __name__ == '__main__':
   # Read PR synonyms
   with open(pwd + '/../build/pr-exact-synonyms.tsv') as f:
     rows = csv.reader(f, delimiter='\t')
-    for row in rows:
-      iri = row[0]
-      synonym = row[1]
-      if iri and synonym:
-        synonym_iris[synonym] = iri
+    to_iris = get_iri_exact_label_maps(rows)
+    update_maps(to_iris)
 
   # Read CL
   ns = {

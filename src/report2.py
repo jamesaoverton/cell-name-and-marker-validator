@@ -5,7 +5,7 @@ import csv
 import re
 
 from collections import defaultdict # maybe eventually remove this import
-from common import get_iri_special_label_maps, get_iri_label_maps
+from common import get_iri_special_label_maps, get_iri_label_maps, get_iri_exact_label_maps
 
 
 def get_markers(normalized_rows):
@@ -37,19 +37,6 @@ def get_iri_short_label_maps(short_rows):
     iri_shorts[iri] = short
 
   return ishort_iris, iri_shorts
-
-
-def get_iri_exact_label_maps(exact_rows, ishort_iris):
-  # This maps exact labels to lists IRIs
-  iexact_iris = defaultdict(list)
-
-  for row in exact_rows:
-    (iri, exact) = row
-    # Only add the exact label to the map if it isn't already in the short labels dict:
-    if not exact.lower() in ishort_iris:
-      iexact_iris[exact.lower()].append(iri)
-
-  return iexact_iris
 
 
 def generate_report_rows(markers, ilabel_iris, iri_labels, ishort_iris, iri_shorts,
