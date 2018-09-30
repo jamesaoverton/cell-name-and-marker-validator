@@ -17,17 +17,17 @@ from common import (extract_suffix_syns_symbs, get_iri_special_label_maps, get_i
 pwd = path.dirname(path.realpath(__file__))
 app = Flask(__name__)
 
-# Global dictionaries
-
 # dict mapping suffix names to their symbolic suffix representation:
 suffixsymbs = {}
 # OrderedDict mapping suffix synonyms to their standardised suffix name:
 suffixsyns = OrderedDict()
 
-# Maps label synonyms to IRIs
+# The maps below all have names of the form: <from>_<to>.
+
+# From synonyms to IRIs. Note that the keys to this dictionary are always lowercase.
 synonym_iris = {}
 
-# Maps IRIs to labels
+# From IRIs to labels
 iri_labels = {
   'http://purl.obolibrary.org/obo/RO_0002104': 'has plasma membrane part',
   'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part': 'lacks plasma membrane part',
@@ -35,10 +35,13 @@ iri_labels = {
   'http://purl.obolibrary.org/obo/cl#has_low_plasma_membrane_amount': 'has low plasma membrane amount'
 }
 
+# From IRIs to parents
 iri_parents = {}
 
+# From IRIs to gates
 iri_gates = {}
 
+# Mapping of suffixes to their names
 level_names = {
   '++': 'high',
   '+~': 'medium',
@@ -59,7 +62,11 @@ iri_levels = {v: k for k, v in level_iris.items()}
 
 
 def populate_maps():
-  def update_maps(to_iris={}, from_iris={}):
+  """
+  Read data from various files in the build directory and use it to populate the maps (dicts)
+  that will be used by the server.
+  """
+  def update_main_maps(to_iris={}, from_iris={}):
     # This inner function updates the synonyms_iris map with the contents of to_iris, and the
     # iri_labels map with the contents of from_iris.
     iri_labels.update(from_iris)
@@ -70,27 +77,29 @@ def populate_maps():
   # Read suffix symbols and suffix synonyms:
   with open(pwd + '/../build/value-scale.tsv') as f:
     rows = csv.DictReader(f, delimiter='\t')
-    suffixsymbs, suffixsyns = extract_suffix_syns_symbs(rows)
+    tmp_1, tmp_2 = extract_suffix_syns_symbs(rows)
+    suffixsymbs.update(tmp_1)
+    suffixsyns .update(tmp_2)
 
-  # Read special gates:
+  # Read special gates and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/special-gates.tsv') as f:
     rows = csv.DictReader(f, delimiter='\t')
     to_iris, from_iris = get_iri_special_label_maps(rows)
-    update_maps(to_iris, from_iris)
+    update_main_maps(to_iris, from_iris)
 
-  # Read PR labels
+  # Read PR labels and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/pr-labels.tsv') as f:
     rows = csv.reader(f, delimiter='\t')
     to_iris, from_iris = get_iri_label_maps(rows)
-    update_maps(to_iris, from_iris)
+    update_main_maps(to_iris, from_iris)
 
-  # Read PR synonyms
+  # Read PR synonyms and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/pr-exact-synonyms.tsv') as f:
     rows = csv.reader(f, delimiter='\t')
     to_iris = get_iri_exact_label_maps(rows)
-    update_maps(to_iris)
+    update_main_maps(to_iris)
 
-  # Read CL
+  # Read CL data
   ns = {
     'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
     'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
@@ -116,10 +125,10 @@ def populate_maps():
       label = child.findtext(rdfs_label)
       if label:
         iri_labels[iri] = label
-        synonym_iris[label] = iri
+        synonym_iris[label.lower()] = iri
 
       for synonym in child.findall('oboInOwl:hasExactSynonym', ns):
-        synonym_iris[synonym.text] = iri
+        synonym_iris[synonym.text.lower()] = iri
 
       iri_gates[iri] = []
       for part in child.findall('owl:equivalentClass/owl:Class/owl:intersectionOf/*', ns):
@@ -167,6 +176,7 @@ def decorate_gate(kind, level):
 def process_gate(gate_string):
   # If the gate string has a suffix which is a synonym of one of the standard suffixes, then replace
   # it with the standard suffix:
+
   for suffix in suffixsyns.keys():
     if gate_string.endswith(suffix):
       gate_string = re.sub('\s*' + re.escape(suffix) + '$', suffixsymbs[suffixsyns[suffix]],
@@ -178,8 +188,8 @@ def process_gate(gate_string):
   kind_name = re.sub('\[.*\]', '', kind_name)
   level_name = re.search('[\-\+\~]*$', gate_string).group(0)
   kind = None
-  if kind_name in synonym_iris:
-    kind = synonym_iris[kind_name]
+  if kind_name.lower() in synonym_iris:
+    kind = synonym_iris[kind_name.lower()]
   level = None
   if level_name == '':
     level_name = '+'
@@ -254,8 +264,8 @@ def get_gate_info_for_cell(cell_iri):
 
 def get_cell_iri(cell_name):
   # Find the IRI for the cell based on cell_name, which can be a: label/synonym, ID, or IRI.
-  if cell_name in synonym_iris:
-    cell_iri = synonym_iris[cell_name]
+  if cell_name.lower() in synonym_iris:
+    cell_iri = synonym_iris[cell_name.lower()]
   elif cell_name in iri_labels:
     cell_iri = cell_name
   else:
@@ -268,13 +278,13 @@ def get_cell_iri(cell_name):
 def parse_cells_field(cells_field):
   cell = {}
   # Extract the cell name and the gates specified in the cells field of the request string
-  cell['name'], cell['gates'] = get_cell_name_and_gates(cells_field)
+  cell_name, cell_gates = get_cell_name_and_gates(cells_field)
   # Get the cell and gate information for the gates specified in the cells field
-  cell['iri'] = get_cell_iri(cell['name'])
-  cell['core_info'] = get_cell_core_info(cell['gates'], cell['iri'])
+  cell_iri = get_cell_iri(cell_name)
+  cell['core_info'] = get_cell_core_info(cell_gates, cell_iri)
   # Include the information from cell_gates (the gates specified in the request) to cell_results
   # (the list of gates extracted based on the cell's IRI)
-  cell['results'] = get_gate_info_for_cell(cell['iri']) + cell['gates']
+  cell['results'] = get_gate_info_for_cell(cell_iri) + cell_gates
   return cell
 
 
@@ -358,4 +368,142 @@ def test_server():
   cell = parse_cells_field(cells_field)
   gating = parse_gates_field(gates_field, cell)
 
-  # TODO: ASSERT AGAINST THE OLD VERSION OF THE OUTPUT
+  assert cell == {
+    'core_info': {
+      'cell_gates': [
+        {'conflict': True,
+         'gate': 'CD19-',
+         'kind': 'http://purl.obolibrary.org/obo/PR_000001002',
+         'kind_label': 'CD19 molecule',
+         'kind_name': 'CD19',
+         'kind_recognized': True,
+         'level': 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part',
+         'level_label': 'lacks plasma membrane part',
+         'level_name': 'negative',
+         'level_recognized': True}],
+      'conflicts': True,
+      'has_cell_gates': True,
+      'iri': 'http://purl.obolibrary.org/obo/CL_0000624',
+      'label': 'CD4-positive, alpha-beta T cell',
+      'parent': 'http://purl.obolibrary.org/obo/CL_0000791',
+      'parent_label': 'mature alpha-beta T cell',
+      'recognized': True},
+    'results': [
+      {'conflict': True,
+       'kind': 'http://purl.obolibrary.org/obo/PR_000001004',
+       'kind_label': 'CD4 molecule',
+       'kind_recognized': True,
+       'level': 'http://purl.obolibrary.org/obo/RO_0002104',
+       'level_label': 'has plasma membrane part',
+       'level_name': 'positive',
+       'level_recognized': True},
+      {'kind': 'http://purl.obolibrary.org/obo/PR_000025402',
+       'kind_label': 'T cell receptor co-receptor CD8',
+       'kind_recognized': True,
+       'level': 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part',
+       'level_label': 'lacks plasma membrane part',
+       'level_name': 'negative',
+       'level_recognized': True},
+      {'conflict': True,
+       'gate': 'CD19-',
+       'kind': 'http://purl.obolibrary.org/obo/PR_000001002',
+       'kind_label': 'CD19 molecule',
+       'kind_name': 'CD19',
+       'kind_recognized': True,
+       'level': 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part',
+       'level_label': 'lacks plasma membrane part',
+       'level_name': 'negative',
+       'level_recognized': True}]}
+
+  assert gating == {
+    'conflicts': [
+      {'cell_level': 'http://purl.obolibrary.org/obo/RO_0002104',
+       'cell_level_name': 'positive',
+       'conflict': True,
+       'gate': 'CD4-',
+       'kind': 'http://purl.obolibrary.org/obo/PR_000001004',
+       'kind_label': 'CD4 molecule',
+       'kind_name': 'CD4',
+       'kind_recognized': True,
+       'level': 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part',
+       'level_label': 'lacks plasma membrane part',
+       'level_name': 'negative',
+       'level_recognized': True},
+      {'cell_level': 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part',
+       'cell_level_name': 'negative',
+       'conflict': True,
+       'gate': 'CD19+',
+       'kind': 'http://purl.obolibrary.org/obo/PR_000001002',
+       'kind_label': 'CD19 molecule',
+       'kind_name': 'CD19',
+       'kind_recognized': True,
+       'level': 'http://purl.obolibrary.org/obo/RO_0002104',
+       'level_label': 'has plasma membrane part',
+       'level_name': 'positive',
+       'level_recognized': True}],
+    'has_errors': True,
+    'results': [
+      {'conflict': True,
+       'gate': 'CD4-',
+       'kind': 'http://purl.obolibrary.org/obo/PR_000001004',
+       'kind_label': 'CD4 molecule',
+       'kind_name': 'CD4',
+       'kind_recognized': True,
+       'level': 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part',
+       'level_label': 'lacks plasma membrane part',
+       'level_name': 'negative',
+       'level_recognized': True},
+      {'conflict': True,
+       'gate': 'CD19+',
+       'kind': 'http://purl.obolibrary.org/obo/PR_000001002',
+       'kind_label': 'CD19 molecule',
+       'kind_name': 'CD19',
+       'kind_recognized': True,
+       'level': 'http://purl.obolibrary.org/obo/RO_0002104',
+       'level_label': 'has plasma membrane part',
+       'level_name': 'positive',
+       'level_recognized': True},
+      {'gate': 'CD20-',
+       'kind': 'http://purl.obolibrary.org/obo/PR_000001289',
+       'kind_label': 'membrane-spanning 4-domains subfamily A member 1',
+       'kind_name': 'CD20',
+       'kind_recognized': True,
+       'level': 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part',
+       'level_label': 'lacks plasma membrane part',
+       'level_name': 'negative',
+       'level_recognized': True},
+      {'gate': 'CD27++',
+       'kind': 'http://purl.obolibrary.org/obo/PR_000001963',
+       'kind_label': 'CD27 molecule',
+       'kind_name': 'CD27',
+       'kind_recognized': True,
+       'level': 'http://purl.obolibrary.org/obo/cl#has_high_plasma_membrane_amount',
+       'level_label': 'has high plasma membrane amount',
+       'level_name': 'high',
+       'level_recognized': True},
+      {'gate': 'CD38+-',
+       'kind': 'http://purl.obolibrary.org/obo/PR_000001408',
+       'kind_label': 'ADP-ribosyl cyclase/cyclic ADP-ribose hydrolase 1',
+       'kind_name': 'CD38',
+       'kind_recognized': True,
+       'level': 'http://purl.obolibrary.org/obo/cl#has_low_plasma_membrane_amount',
+       'level_label': 'has low plasma membrane amount',
+       'level_name': 'low',
+       'level_recognized': True},
+      {'gate': 'infected[Dengue virus]',
+       'kind': None,
+       'kind_name': 'infected',
+       'kind_recognized': False,
+       'level': 'http://purl.obolibrary.org/obo/RO_0002104',
+       'level_label': 'has plasma membrane part',
+       'level_name': 'positive',
+       'level_recognized': True},
+      {'gate': 'CD56[glycosylated]+',
+       'kind': 'http://purl.obolibrary.org/obo/PR_000001024',
+       'kind_label': 'neural cell adhesion molecule 1',
+       'kind_name': 'CD56',
+       'kind_recognized': True,
+       'level': 'http://purl.obolibrary.org/obo/RO_0002104',
+       'level_label': 'has plasma membrane part',
+       'level_name': 'positive',
+       'level_recognized': True}]}
