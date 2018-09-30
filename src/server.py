@@ -7,7 +7,7 @@ import csv
 import re
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
-from flask import Flask, request, render_template, redirect, url_for
+from flask import Flask, request, render_template
 from os import path
 
 from common import (get_suffix_syns_symbs_maps, get_iri_special_label_maps, get_iri_label_maps,

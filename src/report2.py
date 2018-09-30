@@ -3,6 +3,7 @@
 import argparse
 import csv
 import re
+from collections import defaultdict
 
 from common import (get_iri_special_label_maps, get_iri_label_maps, get_iri_exact_label_maps,
                     get_iri_short_label_maps)

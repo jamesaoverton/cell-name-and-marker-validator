@@ -156,6 +156,15 @@ server: build/pr-labels.tsv build/cl.owl build/value-scale.tsv build/special-gat
 test:
 	pytest-3 src/*
 
+# Check code style
+# || true is appended to force make to ignore the exit code from pycodestyle
+style:
+	pycodestyle src/* | grep -v "indentation is not a multiple of four" || true
+
+# Run the delinter
+lint:
+	pyflakes src/
+
 # Remove spreadsheets, keep big PRO OWL file
 .PHONY: clean
 clean:
