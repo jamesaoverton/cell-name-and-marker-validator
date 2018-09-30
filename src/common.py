@@ -2,7 +2,7 @@ import re
 from collections import defaultdict, OrderedDict
 
 
-def extract_suffix_syns_symbs(rows):
+def get_suffix_syns_symbs_maps(rows):
     suffixsymbs = {}
     suffixsyns = OrderedDict()
     for row in rows:
@@ -62,3 +62,17 @@ def get_iri_exact_label_maps(exact_rows, ishort_iris={}):
       iexact_iris[exact.lower()].append(iri)
 
   return iexact_iris
+
+
+def get_iri_short_label_maps(short_rows):
+  # This maps short labels to lists of IRIs:
+  ishort_iris = defaultdict(list)
+  # This maps IRIs to shorts
+  iri_shorts = {}
+
+  for row in short_rows:
+    (iri, short) = row
+    ishort_iris[short.lower()].append(iri)
+    iri_shorts[iri] = short
+
+  return ishort_iris, iri_shorts

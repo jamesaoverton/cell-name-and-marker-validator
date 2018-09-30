@@ -4,8 +4,8 @@ import argparse
 import csv
 import re
 
-from collections import defaultdict # maybe eventually remove this import
-from common import get_iri_special_label_maps, get_iri_label_maps, get_iri_exact_label_maps
+from common import (get_iri_special_label_maps, get_iri_label_maps, get_iri_exact_label_maps,
+                    get_iri_short_label_maps)
 
 
 def get_markers(normalized_rows):
@@ -23,20 +23,6 @@ def get_markers(normalized_rows):
         markers[marker] += 1
 
   return markers
-
-
-def get_iri_short_label_maps(short_rows):
-  # This maps short labels to lists of IRIs:
-  ishort_iris = defaultdict(list)
-  # This maps IRIs to shorts
-  iri_shorts = {}
-
-  for row in short_rows:
-    (iri, short) = row
-    ishort_iris[short.lower()].append(iri)
-    iri_shorts[iri] = short
-
-  return ishort_iris, iri_shorts
 
 
 def generate_report_rows(markers, ilabel_iris, iri_labels, ishort_iris, iri_shorts,

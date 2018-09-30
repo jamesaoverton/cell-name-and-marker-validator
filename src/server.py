@@ -10,7 +10,7 @@ from collections import OrderedDict
 from flask import Flask, request, render_template, redirect, url_for
 from os import path
 
-from common import (extract_suffix_syns_symbs, get_iri_special_label_maps, get_iri_label_maps,
+from common import (get_suffix_syns_symbs_maps, get_iri_special_label_maps, get_iri_label_maps,
                     get_iri_exact_label_maps)
 
 
@@ -50,13 +50,13 @@ level_names = {
   '-': 'negative'
 }
 
-level_iris = {
-  '++': 'http://purl.obolibrary.org/obo/cl#has_high_plasma_membrane_amount',
-  '+~': 'http://purl.obolibrary.org/obo/RO_0002104',
-  '+-': 'http://purl.obolibrary.org/obo/cl#has_low_plasma_membrane_amount',
-  '+': 'http://purl.obolibrary.org/obo/RO_0002104',
-  '-': 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part'
-}
+level_iris = OrderedDict([
+  ('++', 'http://purl.obolibrary.org/obo/cl#has_high_plasma_membrane_amount'),
+  ('+~', 'http://purl.obolibrary.org/obo/RO_0002104'),
+  ('+-', 'http://purl.obolibrary.org/obo/cl#has_low_plasma_membrane_amount'),
+  ('+', 'http://purl.obolibrary.org/obo/RO_0002104'),
+  ('-', 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part')
+])
 
 iri_levels = {v: k for k, v in level_iris.items()}
 
@@ -77,7 +77,7 @@ def populate_maps():
   # Read suffix symbols and suffix synonyms:
   with open(pwd + '/../build/value-scale.tsv') as f:
     rows = csv.DictReader(f, delimiter='\t')
-    tmp_1, tmp_2 = extract_suffix_syns_symbs(rows)
+    tmp_1, tmp_2 = get_suffix_syns_symbs_maps(rows)
     suffixsymbs.update(tmp_1)
     suffixsyns .update(tmp_2)
 

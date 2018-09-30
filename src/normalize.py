@@ -5,7 +5,7 @@ import argparse
 import csv
 import re
 
-from common import extract_suffix_syns_symbs
+from common import get_suffix_syns_symbs_maps
 
 
 def tokenize(projname, suffixsymbs, suffixsyns, reported):
@@ -222,7 +222,7 @@ def main():
   # This defines the suffix synonyms and sumbols for various scaling indicators,
   # which must be noted during parsing
   rows = csv.DictReader(args.scale, delimiter='\t')
-  suffixsymbs, suffixsyns = extract_suffix_syns_symbs(rows)
+  suffixsymbs, suffixsyns = get_suffix_syns_symbs_maps(rows)
 
   # Load the contents of the file given by the command-line parameter args.mappings.
   # This file associates gate laels with the ontology ids / keywords with which we populate the
