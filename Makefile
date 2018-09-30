@@ -153,7 +153,7 @@ all: build/summary.tsv | build
 server: build/pr-labels.tsv build/cl.owl build/value-scale.tsv build/special-gates.tsv build/pr-exact-synonyms.tsv | build
 
 # Run automated tests
-test:
+test: build/value-scale.tsv build/special-gates.tsv build/pr-labels.tsv build/pr-exact-synonyms.tsv
 	pytest-3 src/*
 
 # Check code style
