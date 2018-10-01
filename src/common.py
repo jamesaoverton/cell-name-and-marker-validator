@@ -3,36 +3,36 @@ from collections import defaultdict, OrderedDict
 
 
 def get_suffix_syns_symbs_maps(rows):
-    suffixsymbs = {}
-    suffixsyns = OrderedDict()
-    for row in rows:
-        suffixsymbs[row['Name']] = row['Symbol']
-        suffixsyns[row['Name']] = row['Name']
-        for synonym in row['Synonyms'].split(','):
-            synonym = synonym.strip()
-            if synonym != '':
-                suffixsyns[synonym] = row['Name']
+  suffixsymbs = {}
+  suffixsyns = OrderedDict()
+  for row in rows:
+    suffixsymbs[row['Name']] = row['Symbol']
+    suffixsyns[row['Name']] = row['Name']
+    for synonym in row['Synonyms'].split(','):
+      synonym = synonym.strip()
+      if synonym != '':
+        suffixsyns[synonym] = row['Name']
 
-    return suffixsymbs, suffixsyns
+  return suffixsymbs, suffixsyns
 
 
 def get_iri_special_label_maps(rows):
-    # This maps special labels to lists of IRIs
-    ispecial_iris = defaultdict(list)
-    # This maps IRIs to special labels:
-    iri_specials = {}
+  # This maps special labels to lists of IRIs
+  ispecial_iris = defaultdict(list)
+  # This maps IRIs to special labels:
+  iri_specials = {}
 
-    for row in rows:
-        iri = row['Ontology ID']
-        label = row['Label']
-        synonyms = re.split(',\s+', row['Synonyms'])
-        iri_specials[iri] = label
-        ispecial_iris[label.lower()].append(iri)
-        # Also map any synonyms for the label to the IRI
-        for synonym in synonyms:
-            ispecial_iris[synonym.lower()].append(iri)
+  for row in rows:
+    iri = row['Ontology ID']
+    label = row['Label']
+    synonyms = re.split(',\s+', row['Synonyms'])
+    iri_specials[iri] = label
+    ispecial_iris[label.lower()].append(iri)
+    # Also map any synonyms for the label to the IRI
+    for synonym in synonyms:
+      ispecial_iris[synonym.lower()].append(iri)
 
-    return ispecial_iris, iri_specials
+  return ispecial_iris, iri_specials
 
 
 def get_iri_label_maps(label_rows):
