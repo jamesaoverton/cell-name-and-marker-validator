@@ -50,6 +50,11 @@ level_names = {
   '-': 'negative'
 }
 
+# iri_levels is defined to be the inverse of levels_iri. Note that because both '+~' and '+' in
+# level_iris map to 'http://purl.obolibrary.org/obo/RO_0002104', one needs to be careful in how
+# level_iris is ordered. Dictionary keys are always unique, so when iri_levels is generated, the
+# second instance of 'http://purl.obolibrary.org/obo/RO_0002104' will overwrite the first. So '+'
+# must be added to level_iris last, since that is the one that we want in iri_levels.
 level_iris = OrderedDict([
   ('++', 'http://purl.obolibrary.org/obo/cl#has_high_plasma_membrane_amount'),
   ('+~', 'http://purl.obolibrary.org/obo/RO_0002104'),
@@ -57,7 +62,6 @@ level_iris = OrderedDict([
   ('+', 'http://purl.obolibrary.org/obo/RO_0002104'),
   ('-', 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part')
 ])
-
 iri_levels = {v: k for k, v in level_iris.items()}
 
 
