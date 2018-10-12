@@ -129,10 +129,6 @@ build/report2.tsv: src/report2.py build/normalized.tsv build/pr-labels.tsv build
 build/gate-mappings.tsv: build/special-gates.tsv build/pr-exact-synonyms.tsv | build
 	cat $^ | cut -f 1-2 > $@
 
-# Generate a list of all gate labels that are used
-build/gates.tsv: src/find-gates.py build/gate-mappings.tsv build/normalized.tsv | build
-	$^ $@
-
 # Map gate labels to IDs and report results
 build/report.tsv: src/report.py build/normalized.tsv build/gates.tsv | build
 	$^ $@
