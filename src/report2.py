@@ -10,8 +10,11 @@ from common import (get_iri_special_label_maps, get_iri_label_maps, get_iri_exac
 
 
 def get_markers(normalized_rows):
-  # A dictionary of markers mapped to the number of times they are found as tokens
-  # in the list of normalized rows
+  """
+  Generates a dictionary of markers mapped to the number of times they are found as tokens
+  in the given list of normalized rows.
+  """
+  # The dictionary to be returned:
   markers = defaultdict(int)
 
   for row in normalized_rows:
@@ -28,6 +31,10 @@ def get_markers(normalized_rows):
 
 def generate_report_rows(markers, ilabel_iris, iri_labels, ishort_iris, iri_shorts,
                          iexact_iris, ispecial_iris, iri_specials):
+  """
+  Generate the rows of the report:
+  marker, # tokens found, multiple (TRUE/FALSE), match type, iri, short label, label
+  """
   marker_list = sorted(markers.keys(), key=lambda s: s.casefold())
   rows_to_return = []
 

@@ -159,8 +159,8 @@ def normalize(gates, gate_mappings, special_gates, preferred, symbols):
     # the special_gates dictionary.
     special_entries = [{'label': key, 'ontid': val['Ontology ID']}
                        for key, val in special_gates.items()
-                       if label and (label == key or label in val['Synonyms'].split(', ')
-                                     or label == val['Toxic Synonym'])]
+                       if label and (label == key or label in val['Synonyms'].split(', ') or
+                                     label == val['Toxic Synonym'])]
 
     # This shouldn't happen unless there are duplicate names in the special gates file:
     if special_entries and len(special_entries) > 1:

@@ -156,7 +156,9 @@ def populate_maps():
 
 
 def decorate_gate(kind, level):
-  # Create and return a dictionary with information on the supplied gate type and level
+  """
+  Create and return a dictionary with information on the supplied gate type and level
+  """
   gate = {
     'kind': kind,
     'kind_recognized': False,
@@ -178,9 +180,12 @@ def decorate_gate(kind, level):
 
 
 def process_gate(gate_string):
+  """
+  In the given gate, replace any suffix synonym with the standard suffix, decorate the
+  gate, and then add the gate string, kind, and level information.
+  """
   # If the gate string has a suffix which is a synonym of one of the standard suffixes, then replace
   # it with the standard suffix:
-
   for suffix in suffixsyns.keys():
     if gate_string.endswith(suffix):
       gate_string = re.sub('\s*' + re.escape(suffix) + '$', suffixsymbs[suffixsyns[suffix]],
@@ -213,7 +218,9 @@ def process_gate(gate_string):
 
 
 def get_cell_name_and_gates(cells_field):
-  # Parse out the name and gate list from the given cells field
+  """
+  Parse out the name and gate list from the given cells field
+  """
   cell_gates = []
   if '&' in cells_field:
     cells_fields = cells_field.split('&', maxsplit=1)
@@ -231,7 +238,9 @@ def get_cell_name_and_gates(cells_field):
 
 
 def get_cell_core_info(cell_gates, cell_iri):
-  # Initialise a dictionary which will contain information about this cell
+  """
+  Initialise a dictionary which will contain information about this cell
+  """
   cell = {'recognized': False, 'conflicts': False, 'has_cell_gates': len(cell_gates) > 0,
           'cell_gates': cell_gates}
   if cell_iri in iri_gates:
@@ -252,11 +261,13 @@ def get_cell_core_info(cell_gates, cell_iri):
 
 
 def get_gate_info_for_cell(cell_iri):
+  """
+  For each gate associated with the cell IRI, create a dictionary with information about it
+  and append it to a list which is eventually returned.
+  """
   cell_results = []
 
   if cell_iri:
-    # For each gate associated with the cell IRI, create a dictionary with information about it
-    # and append it to cell_results
     for gate in iri_gates[cell_iri]:
       gate = decorate_gate(gate['kind'], gate['level'])
       if gate['level'] in iri_levels:
@@ -267,7 +278,9 @@ def get_gate_info_for_cell(cell_iri):
 
 
 def get_cell_iri(cell_name):
-  # Find the IRI for the cell based on cell_name, which can be a: label/synonym, ID, or IRI.
+  """
+  Find the IRI for the cell based on cell_name, which can be a: label/synonym, ID, or IRI.
+  """
   if cell_name.lower() in synonym_iris:
     cell_iri = synonym_iris[cell_name.lower()]
   elif cell_name in iri_labels:
@@ -280,6 +293,10 @@ def get_cell_iri(cell_name):
 
 
 def parse_cells_field(cells_field):
+  """
+  Create and return a dictionary with information about the cell extracted from the given
+  cells_field: its name, its associated gates, its IRI, and other core information about the cell.
+  """
   cell = {}
   # Extract the cell name and the gates specified in the cells field of the request string
   cell_name, cell_gates = get_cell_name_and_gates(cells_field)
@@ -293,6 +310,12 @@ def parse_cells_field(cells_field):
 
 
 def parse_gates_field(gates_field, cell):
+  """
+  Parses the gates field submitted through the web form for a given cell.
+  The gates field should be a list of gates separated by semicolons.
+  Also check for and indicate any discrepancies between the gates information and the extracted
+  cell info.
+  """
   gating = {'results': [], 'conflicts': [], 'has_errors': False}
   # Assume gates are separated by semicolons
   gate_strings = re.split(r';\s*', gates_field)

@@ -3,6 +3,9 @@ from collections import defaultdict, OrderedDict
 
 
 def get_suffix_syns_symbs_maps(rows):
+  """
+  From the given data rows, extract lists of suffix symbols and suffix synonyms.
+  """
   suffixsymbs = {}
   suffixsyns = OrderedDict()
   for row in rows:
@@ -17,6 +20,9 @@ def get_suffix_syns_symbs_maps(rows):
 
 
 def get_iri_special_label_maps(rows):
+  """
+  From the given data rows, extract a map from IRIs to special labels as well as a reverse map.
+  """
   # This maps special labels to lists of IRIs
   ispecial_iris = defaultdict(list)
   # This maps IRIs to special labels:
@@ -36,6 +42,9 @@ def get_iri_special_label_maps(rows):
 
 
 def get_iri_label_maps(label_rows):
+  """
+  From the given data rows, extract a map from IRIs to labels as well as a reverse map.
+  """
   # This maps labels to lists of IRIs:
   ilabel_iris = defaultdict(list)
   # This maps IRIs to labels
@@ -52,6 +61,10 @@ def get_iri_label_maps(label_rows):
 
 
 def get_iri_exact_label_maps(exact_rows, ishort_iris={}):
+  """
+  From the given data rows, extract a map from exact labels to IRIs, ommitting any that are
+  already contained in ishort_iris (i.e. any exact labels that are also short labels).
+  """
   # This maps exact labels to lists IRIs
   iexact_iris = defaultdict(list)
 
@@ -65,6 +78,9 @@ def get_iri_exact_label_maps(exact_rows, ishort_iris={}):
 
 
 def get_iri_short_label_maps(short_rows):
+  """
+  From the given data rows, extract a map from IRIs to short labels as well as a reverse map.
+  """
   # This maps short labels to lists of IRIs:
   ishort_iris = defaultdict(list)
   # This maps IRIs to shorts

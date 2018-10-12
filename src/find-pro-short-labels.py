@@ -7,6 +7,10 @@ import sys
 
 
 def generate_rows(ntriples):
+  """
+  Accepts a list of ntriples (the output of the `rapper` utility) and generates a row consisting of
+  an ontology id and a PRO short label.
+  """
   last_genid = None
   ontology_url = None
   label = None
@@ -34,7 +38,7 @@ def generate_rows(ntriples):
     if not is_pro_short_label and 'pr#PRO-short-label' in ntriple['third']:
       is_pro_short_label = True
     if (not ontology_url and 'owl#annotatedSource' in ntriple['second'] and
-        re.match('<http://purl.obolibrary.org/obo/PR_0',  ntriple['third'])):
+        re.match('<http://purl.obolibrary.org/obo/PR_0', ntriple['third'])):
       ontology_url = ntriple['third'].strip('<>')
     if not label and 'owl#annotatedTarget' in ntriple['second']:
       label = ntriple['third'].split('^^')[0].strip('"')
