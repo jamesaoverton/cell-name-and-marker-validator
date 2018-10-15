@@ -2,7 +2,7 @@ language: python
 python: "3.6"
 # command to install dependencies
 before_install:
-  - sudo apt-get install -y raptor2
+  - sudo apt-get install -y raptor2-utils
 install:
   - pip install -r requirements.txt
 # command to run tests
