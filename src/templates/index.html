@@ -67,7 +67,7 @@ form {
               &amp;
               {% for result in cell.cell_gates %}
               {% if result.kind_recognized %}
-              <a href="{{ result.kind }}">{{ result.gate }}</a>{% if not loop.last %};{% endif %}
+              <a href="{{ result.kind }}">{{ result.gate }}</a>{% if not loop.last %},{% endif %}
               {% endif %}
               {% endfor %}
             {% endif %}
@@ -95,7 +95,7 @@ form {
             <p>
             {% for result in gate_results %}
             {% if result.kind_recognized %}
-            <a href="{{ result.kind }}">{{ result.gate }}</a>{% if not loop.last %};{% endif %}
+            <a href="{{ result.kind }}">{{ result.gate }}</a>{% if not loop.last %},{% endif %}
             {% endif %}
             {% endfor %}
             </p>

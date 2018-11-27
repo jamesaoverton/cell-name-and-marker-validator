@@ -227,7 +227,7 @@ def get_cell_name_and_gates(cells_field):
     cell_name = cells_fields[0].strip()
     cell_gating = cells_fields[1].strip()
     # Gates are assumed to be separated by semicolons
-    gate_strings = re.split(r';\s*', cell_gating)
+    gate_strings = re.split(r',\s*', cell_gating)
     for gate_string in gate_strings:
       gate, has_errors = process_gate(gate_string)
       cell_gates.append(gate)
@@ -318,7 +318,7 @@ def parse_gates_field(gates_field, cell):
   """
   gating = {'results': [], 'conflicts': [], 'has_errors': False}
   # Assume gates are separated by semicolons
-  gate_strings = re.split(r';\s*', gates_field)
+  gate_strings = re.split(r',\s*', gates_field)
   for gate_string in gate_strings:
     gate, has_errors = process_gate(gate_string)
     if has_errors and not gating['has_errors']:
@@ -359,7 +359,7 @@ def my_app():
 
   # gates_field holds gate names from the protein ontology database; if not specified, it gets
   # initialised to the following default value, otherwise get it from the request.
-  gates_field = 'CD4-; CD19+; CD20-; CD27++; CD38+-; infected[Dengue virus]; CD56[glycosylated]+'
+  gates_field = 'CD4-, CD19+, CD20-, CD27++, CD38+-, CD56[glycosylated]+'
   if 'gates' in request.args:
     gates_field = request.args['gates'].strip()
 
@@ -391,7 +391,7 @@ if __name__ == '__main__':
 def test_server():
   populate_maps()
   cells_field = 'CD4-positive, alpha-beta T cell & CD19-'
-  gates_field = 'CD4-; CD19+; CD20-; CD27++; CD38+-; infected[Dengue virus]; CD56[glycosylated]+'
+  gates_field = 'CD4-, CD19+, CD20-, CD27++, CD38+-, infected[Dengue virus], CD56[glycosylated]+'
   cell = parse_cells_field(cells_field)
   gating = parse_gates_field(gates_field, cell)
 
