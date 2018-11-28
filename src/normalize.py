@@ -5,7 +5,7 @@ import argparse
 import csv
 import re
 
-from common import get_suffix_syns_symbs_maps
+from common import get_suffix_syns_symbs_maps, split_gate
 
 
 def tokenize(projname, suffixsymbs, suffixsyns, reported):
@@ -114,9 +114,11 @@ def tokenize(projname, suffixsymbs, suffixsyns, reported):
     gate = gate.strip()
     gate = re.sub('ý', '-', gate)  # Unicode hyphen
 
+    # Suffix synonyms are matched case-insensitively:
     for suffixsyn in suffixsyns.keys():
-      if gate.endswith(suffixsyn):
-        gate = re.sub('\s*' + re.escape(suffixsyn) + '$', suffixsymbs[suffixsyns[suffixsyn]], gate)
+      if gate.casefold().endswith(suffixsyn.casefold()):
+        gate = re.sub('\s*' + re.escape(suffixsyn) + '$', suffixsymbs[suffixsyns[suffixsyn]], gate,
+                      flags=re.IGNORECASE)
         continue
 
     gate = re.sub(' ', '_', gate)
@@ -139,28 +141,20 @@ def normalize(gates, gate_mappings, special_gates, preferred, symbols):
       special_gates: additional information regarding a certain number of special gates.
       symbols: list of suffix symbols
   """
-
-  # Inner function to split the name of a gate from its suffix symbol.
-  def split_gate(gate):
-    # Reverse sort the suffix symbols by length to make sure we don't match on a substring of
-    # a longer suffix symbol when we are looking for a shorter suffix symbol
-    # (e.g. '+' is a substring of '++') so we need to search for '++' before searching for '+'
-    for symbol in sorted(list(symbols), key=len, reverse=True):
-      if gate.endswith(symbol):
-        return [gate[0:-len(symbol)], symbol]
-    # If we get to here then there isn't a suffix.
-    return [gate, '']
-
   ontologized_gates = []
   preferred_label_gates = []
   for gate in gates:
-    label, suffixsymb = split_gate(gate)
+    label, suffixsymb = split_gate(gate, symbols)
     # Get any label / ontology id pairs corresponding to the synonym represented by `gate` from
-    # the special_gates dictionary.
-    special_entries = [{'label': key, 'ontid': val['Ontology ID']}
-                       for key, val in special_gates.items()
-                       if label and (label == key or label in val['Synonyms'].split(', ') or
-                                     label == val['Toxic Synonym'])]
+    # the special_gates dictionary. Note that we match case-insensitively to the special_gates
+    # dictionary
+    special_entries = [
+      {'label': key, 'ontid': val['Ontology ID']}
+      for key, val in special_gates.items()
+      if label and (
+          label.casefold() == key.casefold() or
+          label.casefold() in [v.casefold() for v in val['Synonyms'].split(', ')] or
+          label.casefold() in [v.casefold() for v in val['Toxic Synonym'] .split(', ')])]
 
     # This shouldn't happen unless there are duplicate names in the special gates file:
     if special_entries and len(special_entries) > 1:
@@ -361,10 +355,10 @@ def test_normalize():
   }
 
   special_gates = {
-    'Michael': {'Ontology ID': 'PR:034', 'Synonyms': 'Mike, Mickey, Mick',
-                'Toxic Synonym': 'Mikey'},
-    'Robert': {'Ontology ID': 'PR:037', 'Synonyms': 'Rob, Bob, Bert',
-               'Toxic Synonym': 'Bobert'}
+    'Michael': {'Ontology ID': 'PR:034', 'Synonyms': 'mike, mickey, mick',
+                'Toxic Synonym': 'mikey'},
+    'Robert': {'Ontology ID': 'PR:037', 'Synonyms': 'rob, bob, bert',
+               'Toxic Synonym': 'bobert'}
   }
 
   preferred = {
@@ -532,10 +526,10 @@ def test_normalize():
   assert ontologized == ['PR:041+', 'PR:027-']
   assert preferized == ['TNFa+', 'IFNg-']
 
-  reported = 'Mikeyhigh/Rob+/Alexa350 (high)/CD33+ý'
+  reported = 'Mikeyhigh/RobLO/Alexa350 (high)/CD33+ý'
   tokenized = tokenize('Some Project', suffixsymbs, suffixsyns, reported)
-  assert tokenized == ['Mikey++', 'Rob+', 'Alexa350++', 'CD33+-']
+  assert tokenized == ['Mikey++', 'Rob+-', 'Alexa350++', 'CD33+-']
   preferized, ontologized = normalize(tokenized, gate_mappings, special_gates, preferred,
                                       suffixsymbs.values())
-  assert ontologized == ['PR:034++', 'PR:037+', 'PR:001++', 'PR:014+-']
-  assert preferized == ['Michael++', 'Robert+', 'Axexa350++', 'CD33+-']
+  assert ontologized == ['PR:034++', 'PR:037+-', 'PR:001++', 'PR:014+-']
+  assert preferized == ['Michael++', 'Robert+-', 'Axexa350++', 'CD33+-']

@@ -92,3 +92,18 @@ def get_iri_short_label_maps(short_rows):
     iri_shorts[iri] = short
 
   return ishort_iris, iri_shorts
+
+
+def split_gate(gate, symbols):
+  """
+  Splits the given gate_string into a gate name and a suffix, based on the given
+  list of suffix symbols.
+  """
+  # Reverse sort the suffix symbols by length to make sure we don't match on a substring of
+  # a longer suffix symbol when we are looking for a shorter suffix symbol
+  # (e.g. '+' is a substring of '++') so we need to search for '++' before searching for '+'
+  for symbol in sorted(list(symbols), key=len, reverse=True):
+    if gate.endswith(symbol):
+      return [gate[0:-len(symbol)], symbol]
+  # If we get to here then there isn't a suffix.
+  return [gate, '']
