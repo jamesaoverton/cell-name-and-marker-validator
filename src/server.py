@@ -11,7 +11,7 @@ from flask import Flask, request, render_template
 from os import path
 
 from common import (get_suffix_syns_symbs_maps, get_iri_special_label_maps, get_iri_label_maps,
-                    get_iri_exact_label_maps)
+                    get_iri_exact_label_maps, split_gate)
 
 
 pwd = path.dirname(path.realpath(__file__))
@@ -129,10 +129,10 @@ def populate_maps():
       label = child.findtext(rdfs_label)
       if label:
         iri_labels[iri] = label
-        synonym_iris[label.lower()] = iri
+        synonym_iris[label.casefold()] = iri
 
       for synonym in child.findall('oboInOwl:hasExactSynonym', ns):
-        synonym_iris[synonym.text.lower()] = iri
+        synonym_iris[synonym.text.casefold()] = iri
 
       iri_gates[iri] = []
       for part in child.findall('owl:equivalentClass/owl:Class/owl:intersectionOf/*', ns):
@@ -187,18 +187,17 @@ def process_gate(gate_string):
   # If the gate string has a suffix which is a synonym of one of the standard suffixes, then replace
   # it with the standard suffix:
   for suffix in suffixsyns.keys():
-    if gate_string.endswith(suffix):
+    if gate_string.casefold().endswith(suffix.casefold()):
       gate_string = re.sub('\s*' + re.escape(suffix) + '$', suffixsymbs[suffixsyns[suffix]],
-                           gate_string)
-      continue
+                           gate_string, flags=re.IGNORECASE)
 
   # The 'kind' is the root of the gate string without the suffix, and the 'level' is the suffix
-  kind_name = gate_string.rstrip('+-~')
-  kind_name = re.sub('\[.*\]', '', kind_name)
-  level_name = re.search('[\-\+\~]*$', gate_string).group(0)
+  kind_name, level_name = split_gate(gate_string, suffixsymbs.values())
+  # Anything in square brackets should be thought of as a 'comment' and not part of the kind.
+  kind_name = re.sub('\s*\[.*\]\s*', '', kind_name)
   kind = None
-  if kind_name.lower() in synonym_iris:
-    kind = synonym_iris[kind_name.lower()]
+  if kind_name.casefold() in synonym_iris:
+    kind = synonym_iris[kind_name.casefold()]
   level = None
   if level_name == '':
     level_name = '+'
@@ -224,13 +223,18 @@ def get_cell_name_and_gates(cells_field):
   cell_gates = []
   if '&' in cells_field:
     cells_fields = cells_field.split('&', maxsplit=1)
-    cell_name = cells_fields[0].strip()
+    # Remove any enclosing quotation marks and collapse extra spaces inside the string:
+    cell_name = re.sub("^(\"|\')|(\"|\')$", '', cells_fields[0].strip())
+    cell_name = re.sub("\s\s+", " ", cell_name)
     cell_gating = cells_fields[1].strip()
-    # Gates are assumed to be separated by semicolons
-    gate_strings = re.split(r',\s*', cell_gating)
-    for gate_string in gate_strings:
-      gate, has_errors = process_gate(gate_string)
-      cell_gates.append(gate)
+
+    if cell_gating:
+      # Gates are assumed to be separated by commas
+      gate_strings = list(csv.reader([cell_gating], quotechar='"', delimiter=',',
+                                     quoting=csv.QUOTE_ALL, skipinitialspace=True)).pop()
+      for gate_string in gate_strings:
+        gate, has_errors = process_gate(gate_string)
+        cell_gates.append(gate)
   else:
     cell_name = cells_field
 
@@ -281,8 +285,8 @@ def get_cell_iri(cell_name):
   """
   Find the IRI for the cell based on cell_name, which can be a: label/synonym, ID, or IRI.
   """
-  if cell_name.lower() in synonym_iris:
-    cell_iri = synonym_iris[cell_name.lower()]
+  if cell_name.casefold() in synonym_iris:
+    cell_iri = synonym_iris[cell_name.casefold()]
   elif cell_name in iri_labels:
     cell_iri = cell_name
   else:
@@ -312,13 +316,14 @@ def parse_cells_field(cells_field):
 def parse_gates_field(gates_field, cell):
   """
   Parses the gates field submitted through the web form for a given cell.
-  The gates field should be a list of gates separated by semicolons.
+  The gates field should be a list of gates separated by commas.
   Also check for and indicate any discrepancies between the gates information and the extracted
   cell info.
   """
   gating = {'results': [], 'conflicts': [], 'has_errors': False}
-  # Assume gates are separated by semicolons
-  gate_strings = re.split(r',\s*', gates_field)
+  # Assume gates are separated by commas
+  gate_strings = list(csv.reader([gates_field], quotechar='"', delimiter=',', quoting=csv.QUOTE_ALL,
+                                 skipinitialspace=True)).pop()
   for gate_string in gate_strings:
     gate, has_errors = process_gate(gate_string)
     if has_errors and not gating['has_errors']:
@@ -468,7 +473,7 @@ def test_server():
        'level_label': 'has plasma membrane part',
        'level_name': 'positive',
        'level_recognized': True}],
-    'has_errors': True,
+    'has_errors': False,
     'results': [
       {'conflict': True,
        'gate': 'CD4-',
@@ -518,9 +523,10 @@ def test_server():
        'level_name': 'low',
        'level_recognized': True},
       {'gate': 'infected[Dengue virus]',
-       'kind': None,
+       'kind': '?gate=infected',
+       'kind_label': 'infected',
        'kind_name': 'infected',
-       'kind_recognized': False,
+       'kind_recognized': True,
        'level': 'http://purl.obolibrary.org/obo/RO_0002104',
        'level_label': 'has plasma membrane part',
        'level_name': 'positive',
