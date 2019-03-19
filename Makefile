@@ -1,4 +1,4 @@
-# HIPC Cell Validation
+# Cell Name and Marker Validation Demo
 # James A. Overton <james@overton.ca>
 #
 # This Makefile is used to check the `source.tsv` spreadsheet
