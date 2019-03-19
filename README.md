@@ -1,4 +1,4 @@
-# Cell Name and Marker Validation Demo
+# Cell Name and Marker Validator Demo
 
 [![Build Status](https://travis-ci.com/jamesaoverton/cell-name-and-marker-validator.svg?branch=master)](https://travis-ci.com/jamesaoverton/cell-name-and-marker-validator)
 

@@ -1,4 +1,4 @@
-# Cell Name and Marker Validation Demo
+# Cell Name and Marker Validator Demo
 # James A. Overton <james@overton.ca>
 #
 # This Makefile is used to check the `source.tsv` spreadsheet
