@@ -118,6 +118,8 @@ form {
               <td>
                 {% if result.kind_recognized %}
                 <a href="{{ result.kind }}">{{ result.kind_label }}</a>
+                {% else %}
+                <strong class="error">Unrecognized gate</strong>
                 {% endif %}
               </td>
               <td>{{ result.level_name }}</td>

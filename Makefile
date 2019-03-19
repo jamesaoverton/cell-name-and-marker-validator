@@ -39,10 +39,10 @@ build:
 
 ### Project Configuration
 #
-# Most of the configuration is build into this Google Sheet:
+# Most of the configuration is built into this Google Sheet:
 # https://docs.google.com/spreadsheets/d/1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI/edit#gid=0
 
-# Download the 'Specia Gates for OBI' sheet as TSV
+# Download the 'Special Gates for OBI' sheet as TSV
 build/special-gates.tsv: | build
 	curl -L -o $@ "https://docs.google.com/spreadsheets/d/1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI/export?format=tsv&id=1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI&gid=1143376972"
 
@@ -67,14 +67,14 @@ build/pr.owl: | build
 build/pr.nt: build/pr.owl | build
 	rapper $< > $@
 
-# Extract a table of rdfs:label for (proper) PR terms.
+# Extract a table of `rdfs:label`s for (proper) PR terms.
 build/pr-labels.tsv: build/pr.nt | build
 	grep '^<http://purl.obolibrary.org/obo/PR_0' $< \
 	| grep '> <http://www.w3.org/2000/01/rdf-schema#label> "' \
 	| sed 's/^<\(.*\)> <.*> "\(.*\)".*$$/\1	\2/' \
 	> $@
 
-# Extract a table of oio:hasExactSynonyms for (proper) PR terms.
+# Extract a table of `oio:hasExactSynonym`s for (proper) PR terms.
 build/pr-exact-synonyms.tsv: build/pr.nt | build
 	grep '^<http://purl.obolibrary.org/obo/PR_0' $< \
 	| grep '> <http://www.geneontology.org/formats/oboInOwl#hasExactSynonym> "' \
@@ -94,17 +94,18 @@ build/pr-pro-short-labels.tsv: src/find-pro-short-labels.py build/pr.nt | build
 build/cl.owl: | build
 	curl -k -L -o $@ "http://purl.obolibrary.org/obo/cl.owl"
 
+# Convert CL to N-triples.
 build/cl.nt: build/cl.owl | build
 	rapper $< > $@
 
-# Extract a table of rdfs:label for CL terms.
+# Extract a table of `rdfs:label`s for CL terms.
 build/cl-labels.tsv: build/cl.nt | build
 	grep '^<http://purl.obolibrary.org/obo/CL_0' $< \
 	| grep '> <http://www.w3.org/2000/01/rdf-schema#label> "' \
 	| sed 's/^<\(.*\)> <.*> "\(.*\)".*$$/\1	\2/' \
 	> $@
 
-# Extract a table of oio:hasExactSynonyms for CL terms.
+# Extract a table of `oio:hasExactSynonym`s for CL terms.
 build/cl-exact-synonyms.tsv: build/cl.nt | build
 	grep '^<http://purl.obolibrary.org/obo/CL_0' $< \
 	| grep '> <http://www.geneontology.org/formats/oboInOwl#hasExactSynonym> "' \
@@ -118,7 +119,15 @@ build/cl-exact-synonyms.tsv: build/cl.nt | build
 # See the script files for more documentation.
 
 # Normalize the cell population strings across studies
-build/normalized.tsv: src/normalize.py build/excluded-experiments.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv build/pr-pro-short-labels.tsv source.tsv | build
+build/normalized.tsv: src/normalize.py build/excluded-experiments.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv build/pr-pro-short-labels.tsv source2.tsv | build
+	$^ $@
+
+# Normalize the cell population strings across studies, both population name and definition
+build/normalized2.tsv: src/normalize2.py build/excluded-experiments.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv build/pr-pro-short-labels.tsv build/cl.owl source2.tsv | build
+	$^ $@
+
+# Map gate labels to IDs and report results
+build/report.tsv: src/report.py build/normalized.tsv build/gates.tsv | build
 	$^ $@
 
 # Map gate labels to IDs and report results
@@ -128,10 +137,6 @@ build/report2.tsv: src/report2.py build/normalized.tsv build/pr-labels.tsv build
 # Build a list of ontology IDs and labels that we can recognize
 build/gate-mappings.tsv: build/special-gates.tsv build/pr-exact-synonyms.tsv | build
 	cat $^ | cut -f 1-2 > $@
-
-# Map gate labels to IDs and report results
-build/report.tsv: src/report.py build/normalized.tsv build/gates.tsv | build
-	$^ $@
 
 # Build a table summarizing mapping success by centre
 build/summary.tsv: src/summarize.py build/report.tsv | build

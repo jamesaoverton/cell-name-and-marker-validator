@@ -10,8 +10,9 @@ from collections import OrderedDict
 from flask import Flask, request, render_template
 from os import path
 
-from common import (get_suffix_syns_symbs_maps, get_iri_special_label_maps, get_iri_label_maps,
-                    get_iri_exact_label_maps, split_gate)
+from common import (iri_labels, iri_parents, iri_gates, synonym_iris, level_names, level_iris, iri_levels,
+                    get_suffix_syns_symbs_maps, get_iri_special_label_maps, get_iri_label_maps,
+                    get_iri_exact_label_maps, get_cell_iri_gates, split_gate)
 
 
 pwd = path.dirname(path.realpath(__file__))
@@ -22,47 +23,6 @@ suffixsymbs = {}
 # OrderedDict mapping suffix synonyms to their standardised suffix name:
 suffixsyns = OrderedDict()
 
-# The maps below all have names of the form: <from>_<to>.
-
-# From synonyms to IRIs. Note that the keys to this dictionary are always lowercase.
-synonym_iris = {}
-
-# From IRIs to labels
-iri_labels = {
-  'http://purl.obolibrary.org/obo/RO_0002104': 'has plasma membrane part',
-  'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part': 'lacks plasma membrane part',
-  'http://purl.obolibrary.org/obo/cl#has_high_plasma_membrane_amount': 'has high plasma membrane amount',
-  'http://purl.obolibrary.org/obo/cl#has_low_plasma_membrane_amount': 'has low plasma membrane amount'
-}
-
-# From IRIs to parents
-iri_parents = {}
-
-# From IRIs to gates
-iri_gates = {}
-
-# Mapping of suffixes to their names
-level_names = {
-  '++': 'high',
-  '+~': 'medium',
-  '+-': 'low',
-  '+': 'positive',
-  '-': 'negative'
-}
-
-# iri_levels is defined to be the inverse of levels_iri. Note that because both '+~' and '+' in
-# level_iris map to 'http://purl.obolibrary.org/obo/RO_0002104', one needs to be careful in how
-# level_iris is ordered. Dictionary keys are always unique, so when iri_levels is generated, the
-# second instance of 'http://purl.obolibrary.org/obo/RO_0002104' will overwrite the first. So '+'
-# must be added to level_iris last, since that is the one that we want in iri_levels.
-level_iris = OrderedDict([
-  ('++', 'http://purl.obolibrary.org/obo/cl#has_high_plasma_membrane_amount'),
-  ('+~', 'http://purl.obolibrary.org/obo/RO_0002104'),
-  ('+-', 'http://purl.obolibrary.org/obo/cl#has_low_plasma_membrane_amount'),
-  ('+', 'http://purl.obolibrary.org/obo/RO_0002104'),
-  ('-', 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part')
-])
-iri_levels = {v: k for k, v in level_iris.items()}
 
 
 def populate_maps():
@@ -76,7 +36,8 @@ def populate_maps():
     iri_labels.update(from_iris)
     # to_iris maps labels to lists of iris, so flatten the lists here:
     for key in to_iris:
-      synonym_iris.update({'{}'.format(key): '{}'.format(','.join(to_iris[key]))})
+      #synonym_iris.update({'{}'.format(key): '{}'.format(','.join(to_iris[key]))})
+      synonym_iris.update({'{}'.format(key): '{}'.format(to_iris[key][0])})
 
   # Read suffix symbols and suffix synonyms:
   with open(pwd + '/../build/value-scale.tsv') as f:
@@ -103,56 +64,8 @@ def populate_maps():
     to_iris = get_iri_exact_label_maps(rows)
     update_main_maps(to_iris)
 
-  # Read CL data
-  ns = {
-    'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
-    'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
-    'xsd': 'http://www.w3.org/2001/XMLSchema#',
-    'owl': 'http://www.w3.org/2002/07/owl#',
-    'obo': 'http://purl.obolibrary.org/obo/',
-    'oboInOwl': 'http://www.geneontology.org/formats/oboInOwl#'
-  }
   tree = ET.parse(pwd + '/../build/cl.owl')
-  root = tree.getroot()
-  obo = 'http://purl.obolibrary.org/obo/'
-  rdf_about = '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about'
-  rdf_resource = '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}resource'
-  rdf_description = '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description'
-  rdfs_label = '{http://www.w3.org/2000/01/rdf-schema#}label'
-  owl_restriction = '{http://www.w3.org/2002/07/owl#}Restriction'
-
-  for child in root.findall('owl:Class', ns):
-    iri = None
-    if rdf_about in child.attrib:
-      iri = child.attrib[rdf_about]
-    if iri and iri.startswith(obo + 'CL_'):  # and iri == obo + 'CL_0000624':
-      label = child.findtext(rdfs_label)
-      if label:
-        iri_labels[iri] = label
-        synonym_iris[label.casefold()] = iri
-
-      for synonym in child.findall('oboInOwl:hasExactSynonym', ns):
-        synonym_iris[synonym.text.casefold()] = iri
-
-      iri_gates[iri] = []
-      for part in child.findall('owl:equivalentClass/owl:Class/owl:intersectionOf/*', ns):
-        if part.tag == rdf_description:
-          parent = part.get(rdf_about)
-          if parent:
-            iri_parents[iri] = parent
-        elif part.tag == owl_restriction:
-          relation = part.find('owl:onProperty', ns)
-          if relation is not None:
-            relation = relation.get(rdf_resource)
-          value = part.find('owl:someValuesFrom', ns)
-          if value is not None:
-            value = value.get(rdf_resource)
-          if value and relation in iri_levels:
-            gate = {
-              'kind': value,
-              'level': relation
-            }
-            iri_gates[iri].append(gate)
+  get_cell_iri_gates(tree)
 
 
 def decorate_gate(kind, level):
@@ -233,10 +146,10 @@ def get_cell_name_and_gates(cells_field):
       gate_strings = list(csv.reader([cell_gating], quotechar='"', delimiter=',',
                                      quoting=csv.QUOTE_ALL, skipinitialspace=True)).pop()
       for gate_string in gate_strings:
-        gate, has_errors = process_gate(gate_string)
+        gate, has_errors = process_gate(gate_string.strip("'"))
         cell_gates.append(gate)
   else:
-    cell_name = cells_field
+    cell_name = cells_field.strip().strip('"\'')
 
   return cell_name, cell_gates
 
@@ -357,7 +270,7 @@ def my_app():
   # initialised to the following default value. Otherwise we get it from the request
   cells_field = 'CD4-positive, alpha-beta T cell & CD19-'
   if 'cells' in request.args:
-    cells_field = request.args['cells'].strip()
+    cells_field = request.args['cells'].strip().replace("‘", "'").replace("’","'")
 
   # Parse the cells_field
   cell = parse_cells_field(cells_field)
@@ -366,7 +279,7 @@ def my_app():
   # initialised to the following default value, otherwise get it from the request.
   gates_field = 'CD4-, CD19+, CD20-, CD27++, CD38+-, CD56[glycosylated]+'
   if 'gates' in request.args:
-    gates_field = request.args['gates'].strip()
+    gates_field = request.args['gates'].strip().replace("‘", "'").replace("’","'")
 
   # Parse the gates_field
   gating = parse_gates_field(gates_field, cell)
