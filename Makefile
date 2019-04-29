@@ -13,8 +13,11 @@
 # - GNU Make <https://www.gnu.org/software/make/>
 # - standard Unix tools: cURL, grep, sed, cut
 # - Python 3
-#   - pytest-3 (https://pytest.org> for running automated tests
+#   - pytest-3 <https://pytest.org> for running automated tests
+#   - Flask for web server
 # - rapper <http://librdf.org/raptor/rapper.html>
+# - Java Runtime Environment 8 or later
+# - ROBOT <http://robot.obolibrary.org>
 
 
 ### GNU Make Configuration
@@ -35,6 +38,9 @@ SHELL := bash
 
 build:
 	mkdir $@
+
+build/robot.jar:
+	curl -L -o $@ "https://github.com/ontodev/robot/releases/download/v1.4.0/robot.jar"
 
 
 ### Project Configuration
@@ -94,6 +100,9 @@ build/pr-pro-short-labels.tsv: src/find-pro-short-labels.py build/pr.nt | build
 build/cl.owl: | build
 	curl -k -L -o $@ "http://purl.obolibrary.org/obo/cl.owl"
 
+build/cl-plus.owl: build/cl.owl src/add-membrane-parts-to-children.ru | build/robot.jar
+	java -jar $| query --input $< --update $(word 2,$^) --output $@
+
 # Convert CL to N-triples.
 build/cl.nt: build/cl.owl | build
 	rapper $< > $@
@@ -123,7 +132,7 @@ build/normalized.tsv: src/normalize.py build/excluded-experiments.tsv build/valu
 	$^ $@
 
 # Normalize the cell population strings across studies, both population name and definition
-build/normalized2.tsv: src/normalize2.py build/excluded-experiments.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv build/pr-pro-short-labels.tsv build/cl.owl source2.tsv | build
+build/normalized2.tsv: src/normalize2.py build/excluded-experiments.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv build/pr-pro-short-labels.tsv build/cl-plus.owl source2.tsv | build
 	$^ $@
 
 # Map gate labels to IDs and report results
@@ -151,10 +160,10 @@ all: build/summary.tsv | build
 
 # Run all the tasks required to run the server
 .PHONY: server
-server: build/pr-labels.tsv build/cl.owl build/value-scale.tsv build/special-gates.tsv build/pr-exact-synonyms.tsv | build
+server: build/pr-labels.tsv build/cl-plus.owl build/value-scale.tsv build/special-gates.tsv build/pr-exact-synonyms.tsv | build
 
 # Run automated tests
-test: build/value-scale.tsv build/special-gates.tsv build/pr-labels.tsv build/pr-exact-synonyms.tsv build/cl.owl
+test: build/value-scale.tsv build/special-gates.tsv build/pr-labels.tsv build/pr-exact-synonyms.tsv build/cl-plus.owl
 	pytest src/*
 
 # Check code style

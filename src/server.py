@@ -64,7 +64,7 @@ def populate_maps():
     to_iris = get_iri_exact_label_maps(rows)
     update_main_maps(to_iris)
 
-  tree = ET.parse(pwd + '/../build/cl.owl')
+  tree = ET.parse(pwd + '/../build/cl-plus.owl')
   get_cell_iri_gates(tree)
 
 
