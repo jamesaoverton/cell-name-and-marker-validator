@@ -307,6 +307,10 @@ def main():
             population_gates.append(preferred_label + iri_levels[gate['level']])
       row['CL definition'] = ', '.join(population_gates)
 
+      # These will be needed later for determining conflicts:
+      extra_gates = preferized_gates.copy()
+      cell_gates = population_gates + preferized_gates
+
       # Determine the gating preferred definition:
       # Remove any surrounding quotation marks
       reported = row['POPULATION_DEFNITION_REPORTED'].strip('"').strip("'")
@@ -316,8 +320,6 @@ def main():
       row['Gating preferred definition'] = ', '.join(preferized_gates)
 
       # Determine the conflicts:
-      extra_gates = preferized_gates.copy()
-      cell_gates = population_gates + preferized_gates
       conflict_type = ''
       conflicts = []
       for population_gate in cell_gates:
