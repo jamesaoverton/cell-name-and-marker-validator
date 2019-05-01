@@ -123,27 +123,19 @@ build/normalized.tsv: src/normalize.py build/excluded-experiments.tsv build/valu
 	$^ $@
 
 # Map gate labels to IDs and report results
-build/report.tsv: src/report.py build/normalized.tsv | build
-	$^ $@
-
-# Map gate labels to IDs and report results
-build/report2.tsv: src/report2.py build/normalized.tsv build/pr-labels.tsv build/pr-pro-short-labels.tsv build/pr-exact-synonyms.tsv build/special-gates.tsv | build
+build/report.tsv: src/report.py build/normalized.tsv build/pr-labels.tsv build/pr-pro-short-labels.tsv build/pr-exact-synonyms.tsv build/special-gates.tsv | build
 	$^ $@
 
 # Build a list of ontology IDs and labels that we can recognize
 build/gate-mappings.tsv: build/special-gates.tsv build/pr-exact-synonyms.tsv | build
 	cat $^ | cut -f 1-2 > $@
 
-# Build a table summarizing mapping success by centre
-build/summary.tsv: src/summarize.py build/report.tsv | build
-	$^ $@
-
 
 ### General Tasks
 
 # Run all the important tasks
 .PHONY: all
-all: build/summary.tsv | build
+all: build/report.tsv | build
 
 # Run all the tasks required to run the server
 .PHONY: server

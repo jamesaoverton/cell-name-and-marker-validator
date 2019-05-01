@@ -313,8 +313,8 @@ def main():
       extra_gates = preferized_gates.copy()
       cell_gates = population_gates + preferized_gates
 
-      # Determine the gating preferred definition:
-      # Remove any surrounding quotation marks
+      # Tokenize and normalize the reported population definition, first removing any surrounding
+      # quotation marks:
       reported = row['POPULATION_DEFNITION_REPORTED'].strip('"').strip("'")
       tokenized_gates = tokenize(row['NAME'], suffixsymbs, suffixsyns, reported)
       row['Gating tokenized'] = ', '.join(tokenized_gates)
