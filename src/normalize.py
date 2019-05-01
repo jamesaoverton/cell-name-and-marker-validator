@@ -318,9 +318,9 @@ def main():
       reported = row['POPULATION_DEFNITION_REPORTED'].strip('"').strip("'")
       tokenized_gates = tokenize(row['NAME'], suffixsymbs, suffixsyns, reported)
       row['Gating tokenized'] = ', '.join(tokenized_gates)
-      row['Gating mapped to ontologies'] = ', '.join(ontologized_gates)
       preferized_gates, ontologized_gates = normalize(
         tokenized_gates, gate_mappings, special_gates, preferred, symbols)
+      row['Gating mapped to ontologies'] = ', '.join(ontologized_gates)
       row['Gating preferred definition'] = ', '.join(preferized_gates)
 
       # Determine the conflicts:

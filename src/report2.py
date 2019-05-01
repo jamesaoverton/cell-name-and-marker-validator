@@ -20,8 +20,11 @@ def get_markers(normalized_rows):
   for row in normalized_rows:
     # Extract the tokens, strip their suffixes, and add them to the markers dict.
     tokenized = row['Gating tokenized']
+    ontologized = row['Gating mapped to ontologies']
+    assert(len(re.split(',\s+', tokenized)) == len(re.split(',\s+', ontologized)))
+
     if tokenized:
-      gates = re.split(';\s+', tokenized)
+      gates = re.split(',\s+', tokenized)
       for gate in gates:
         marker = gate.rstrip('+-~')
         markers[marker] += 1

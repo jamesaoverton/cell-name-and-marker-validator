@@ -15,7 +15,7 @@ def generate_report_row(row):
   if not normalized:
     return None
 
-  ids = re.split(';\s+', normalized)
+  ids = re.split(',\s+', normalized)
   matched_gates = 0
   total_gates = 0
   for i in ids:
