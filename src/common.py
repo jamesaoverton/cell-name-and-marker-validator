@@ -138,8 +138,8 @@ def get_iri_short_label_maps(short_rows):
 
 def get_cell_iri_gates(tree):
   """
-  Given an XML tree from cl.owl, return a map from Cell Ontology class IRIs
-  to arrays of gate dictionaries.
+  Given an XML tree from cl.owl, populate the global maps: synonym_iris, iri_labels, iri_gates,
+  and iri_parents.
   """
 
   ns = {

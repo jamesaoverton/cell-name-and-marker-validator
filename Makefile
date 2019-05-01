@@ -118,12 +118,8 @@ build/cl-exact-synonyms.tsv: build/cl.nt | build
 # Various Python scripts are used to process the `source.tsv` file.
 # See the script files for more documentation.
 
-# Normalize the cell population strings across studies
-build/normalized.tsv: src/normalize.py build/excluded-experiments.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv build/pr-pro-short-labels.tsv source2.tsv | build
-	$^ $@
-
 # Normalize the cell population strings across studies, both population name and definition
-build/normalized2.tsv: src/normalize2.py build/excluded-experiments.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv build/pr-pro-short-labels.tsv build/cl.owl source2.tsv | build
+build/normalized.tsv: src/normalize.py build/excluded-experiments.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv build/pr-pro-short-labels.tsv build/cl.owl source.tsv | build
 	$^ $@
 
 # Map gate labels to IDs and report results

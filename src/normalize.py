@@ -5,7 +5,10 @@ import argparse
 import csv
 import re
 
-from common import get_suffix_syns_symbs_maps, split_gate
+import xml.etree.ElementTree as ET
+
+from common import (iri_labels, iri_parents, iri_gates, synonym_iris, level_names, level_iris,
+                    iri_levels, get_suffix_syns_symbs_maps, get_cell_iri_gates, split_gate)
 
 
 def tokenize(projname, suffixsymbs, suffixsyns, reported):
@@ -197,6 +200,8 @@ def main():
                       help='a TSV file containing extra information about a subset of gates')
   parser.add_argument('preferred', type=argparse.FileType('r'),
                       help='a TSV file which maps ontology ids to preferred labels')
+  parser.add_argument('cells', type=argparse.FileType('r'),
+                      help='an OWL file for the Cell Ontology')
   parser.add_argument('source', type=argparse.FileType('r'),
                       help='the source data TSV file')
   parser.add_argument('output', type=str,
@@ -213,7 +218,7 @@ def main():
     excluded_experiments.add(row['Experiment Accession'])
 
   # Load the contents of the file given by the command-line parameter args.scale.
-  # This defines the suffix synonyms and sumbols for various scaling indicators,
+  # This defines the suffix synonyms and symbols for various scaling indicators,
   # which must be noted during parsing
   rows = csv.DictReader(args.scale, delimiter='\t')
   suffixsymbs, suffixsyns = get_suffix_syns_symbs_maps(rows)
@@ -244,29 +249,100 @@ def main():
   for row in rows:
     preferred[row['Ontology ID']] = row['Preferred Label']
 
-  # Finally, load the contents of the source file. For each row determine the tokenised and
-  # normalised population definition based on the definition reported in the source file and our
-  # scaling indicators. Then copy the row into a new file with additional columns containing the
-  # tokenised and normalised definitions. Ignore any rows describing excluded experiments.
+  # Load the contents of the file given by args.cells. This is an OWL file in XML format. We first
+  # parse it using python's xml library, and then call get_cell_iri_gates to populate the global
+  # maps: common.synonym_iris, common.iri_labels, common.iri_gates, and iri_parents
+  tree = ET.parse(args.cells)
+  get_cell_iri_gates(tree)
+
+  # Finally, load the contents of the source file, process each row and write the processed row
+  # to a new file.
   rows = csv.DictReader(args.source, delimiter='\t')
   with open(args.output, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
-    output_fieldnames = rows.fieldnames + (
-      ['Gating tokenized'] + ['Gating preferred labels'] + ['Gating mapped to ontologies'])
+    # Write the header row:
+    output_fieldnames = [
+      'NAME',
+      'STUDY_ACCESSION',
+      'EXPERIMENT_ACCESSION',
+      'POPULATION_NAME_REPORTED',
+      'CL term',
+      'CL ID',
+      'CL definition',
+      'extra',
+      'POPULATION_DEFNITION_REPORTED',
+      'Population preferred name',
+      'Gating preferred definition',
+      'Conflicts',
+      'Conflict type'
+    ]
     w.writerow(output_fieldnames)
+
+    conflict_count = 0
+    symbols = suffixsymbs.values()
     for row in rows:
-      if not row['EXPERIMENT_ACCESSION'] in excluded_experiments:
-        # Remove any surrounding quotation marks
-        reported = row['POPULATION_DEFNITION_REPORTED'].strip('"').strip("'")
-        tokenized_gates = tokenize(row['NAME'], suffixsymbs, suffixsyns, reported)
-        row['Gating tokenized'] = ', '.join(tokenized_gates)
-        preferized_gates, ontologized_gates = normalize(
-          tokenized_gates, gate_mappings, special_gates, preferred, suffixsymbs.values())
-        row['Gating mapped to ontologies'] = ', '.join(ontologized_gates)
-        row['Gating preferred labels'] = ', '.join(preferized_gates)
-        # Explicitly reference output_fieldnames here to make sure that the order in which the data
-        # is written to the file matches the header order.
-        w.writerow([row[fn] for fn in output_fieldnames])
+      # Ignore any rows describing excluded experiments.
+      if row['EXPERIMENT_ACCESSION'] in excluded_experiments:
+        continue
+
+      # Tokenize and normalize the population name:
+      extra = row['extra'].strip()
+      tokenized_gates = tokenize('Standard', suffixsymbs, suffixsyns, extra)
+      preferized_gates, ontologized_gates = normalize(
+        tokenized_gates, gate_mappings, special_gates, preferred, symbols)
+
+      # Determine the population preferred name:
+      preferred_name = row['CL term'] or ''
+      if preferred_name and preferized_gates:
+        preferred_name += ' & ' + ', '.join(preferized_gates)
+      row['Population preferred name'] = preferred_name
+
+      # Determine the CL definition:
+      population_gates = []
+      cell_type = re.sub('^CL:', 'http://purl.obolibrary.org/obo/CL_', row['CL ID'])
+      if cell_type and cell_type in iri_gates:
+        for gate in iri_gates[cell_type]:
+          preferred_label = preferred.get(gate['kind'])
+          if preferred_label:
+            population_gates.append(preferred_label + iri_levels[gate['level']])
+      row['CL definition'] = ', '.join(population_gates)
+
+      # Determine the gating preferred definition:
+      # Remove any surrounding quotation marks
+      reported = row['POPULATION_DEFNITION_REPORTED'].strip('"').strip("'")
+      tokenized_gates = tokenize(row['NAME'], suffixsymbs, suffixsyns, reported)
+      preferized_gates, ontologized_gates = normalize(
+        tokenized_gates, gate_mappings, special_gates, preferred, symbols)
+      row['Gating preferred definition'] = ', '.join(preferized_gates)
+
+      # Determine the conflicts:
+      extra_gates = preferized_gates.copy()
+      cell_gates = population_gates + preferized_gates
+      conflict_type = ''
+      conflicts = []
+      for population_gate in cell_gates:
+        for definition_gate in preferized_gates:
+          pgate, plevel = split_gate(population_gate, symbols)
+          dgate, dlevel = split_gate(definition_gate, symbols)
+          ppos = plevel != '-'
+          dpos = dlevel != '-'
+          if pgate == dgate and ppos != dpos:
+            conflicts.append(population_gate + '/' + dlevel)
+            if population_gate in extra_gates:
+              conflict_type = 'conflict with extra'
+            else:
+              conflict_type = 'conflict with CL definition'
+      if len(conflicts) > 0:
+        print(conflicts)
+        conflict_count += 1
+      row['Conflicts'] = ', '.join(conflicts)
+      row['Conflict type'] = conflict_type
+
+      # Explicitly reference output_fieldnames here to make sure that the order in which the data
+      # is written to the file matches the header order.
+      w.writerow([row[fn] for fn in output_fieldnames])
+
+    print('Conflicts:', conflict_count)
 
 
 if __name__ == "__main__":
