@@ -272,6 +272,8 @@ def main():
       'extra',
       'POPULATION_DEFNITION_REPORTED',
       'Population preferred name',
+      'Gating tokenized',
+      'Gating mapped to ontologies',
       'Gating preferred definition',
       'Conflicts',
       'Conflict type'
@@ -315,6 +317,8 @@ def main():
       # Remove any surrounding quotation marks
       reported = row['POPULATION_DEFNITION_REPORTED'].strip('"').strip("'")
       tokenized_gates = tokenize(row['NAME'], suffixsymbs, suffixsyns, reported)
+      row['Gating tokenized'] = ', '.join(tokenized_gates)
+      row['Gating mapped to ontologies'] = ', '.join(ontologized_gates)
       preferized_gates, ontologized_gates = normalize(
         tokenized_gates, gate_mappings, special_gates, preferred, symbols)
       row['Gating preferred definition'] = ', '.join(preferized_gates)

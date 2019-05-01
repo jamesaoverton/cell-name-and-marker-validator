@@ -30,14 +30,29 @@ def generate_report_row(row):
 def main():
   parser = argparse.ArgumentParser(description='Parse HIPC cell')
   parser.add_argument('normalized', type=argparse.FileType('r'), help='the normalized TSV file')
-  parser.add_argument('gates', type=argparse.FileType('r'), help='the gates TSV file')
   parser.add_argument('output', type=str, help='the output TSV file')
   args = parser.parse_args()
 
   rows = csv.DictReader(args.normalized, delimiter='\t')
   with open(args.output, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
-    output_fieldnames = rows.fieldnames + ['MATCHED_GATES', 'TOTAL_GATES']
+    # output_fieldnames = rows.fieldnames + ['MATCHED_GATES', 'TOTAL_GATES']
+    output_fieldnames = [
+      'NAME',
+      'STUDY_ACCESSION',
+      'EXPERIMENT_ACCESSION',
+      'POPULATION_NAME_REPORTED',
+      'CL term',
+      'CL ID',
+      'extra',
+      'POPULATION_DEFNITION_REPORTED',
+      'Gating tokenized',
+      'Gating preferred definition',
+      'Gating mapped to ontologies',
+      'MATCHED_GATES',
+      'TOTAL_GATES',
+    ]
+
     w.writerow(output_fieldnames)
     for row in rows:
       report_row = generate_report_row(row)
@@ -55,7 +70,7 @@ def test_report():
   inrow = {
     'EXPERIMENT_ACCESSION': 'EXP14857',
     'Gating mapped to ontologies': 'PR:000001889-; PR:000001892-; !CD3+; PR:000001004+',
-    'Gating preferred labels': 'CD14-; CD33-; !CD3+; CD4+',
+    'Gating preferred definition': 'CD14-; CD33-; !CD3+; CD4+',
     'Gating tokenized': 'CD14-; CD33-; CD3+; CD4+',
     'NAME': 'HIPC Stanford Project',
     'POPULATION_DEFNITION_REPORTED': 'CD14-CD33-/CD3+/CD4+',

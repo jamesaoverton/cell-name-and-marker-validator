@@ -132,8 +132,8 @@ def test_report2():
      'Gating tokenized': ('Intact_cells; intact_singlets; viable_singlets; CD14-; CD33-; CD3+; '
                           'CD4+; CD8-; Non-naive_CD4+; CXCR5+'),
      'NAME': 'HIPC Stanford Project',
-     'Gating preferred labels': ('!Intact_cells; intact_singlets; !viable_singlets; CD14-; CD33-; '
-                                 '!CD3+; CD4+; !CD8-; !Non-naive_CD4+; CXCR5+'),
+     'Gating preferred definition': ('!Intact_cells; intact_singlets; !viable_singlets; CD14-; CD33-; '
+                                     '!CD3+; CD4+; !CD8-; !Non-naive_CD4+; CXCR5+'),
      'POPULATION_DEFNITION_REPORTED': ('Intact cells/intact singlets/viable singlets/CD14-CD33-'
                                        '/CD3+/CD4+CD8-/Non-naive CD4+/CXCR5+'),
      'Gating mapped to ontologies': ('!Intact_cells; intact_singlets; !viable_singlets; '

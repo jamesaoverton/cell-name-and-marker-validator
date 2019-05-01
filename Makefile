@@ -123,7 +123,7 @@ build/normalized.tsv: src/normalize.py build/excluded-experiments.tsv build/valu
 	$^ $@
 
 # Map gate labels to IDs and report results
-build/report.tsv: src/report.py build/normalized.tsv build/gates.tsv | build
+build/report.tsv: src/report.py build/normalized.tsv | build
 	$^ $@
 
 # Map gate labels to IDs and report results

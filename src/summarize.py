@@ -98,7 +98,7 @@ def test_summarize():
     'POPULATION_NAME_REPORTED': 'ID98, CD86+ of IgD-CD27+ memory B cells',
     'POPULATION_DEFNITION_REPORTED': 'CD45+CD19+CD20+IgD-CD27+CD86+',
     'Gating tokenized': 'CD45+; CD19+; CD20+; IgD-; CD27+; CD86+',
-    'Gating preferred labels': 'PTPRC+; CD19+; MS4A1+; !IgD-; CD27+; CD86+',
+    'Gating preferred definition': 'PTPRC+; CD19+; MS4A1+; !IgD-; CD27+; CD86+',
     'Gating mapped to ontologies': ('PR:000001006+; PR:000001002+; PR:000001289+; !IgD-; '
                                     'PR:000001963+; PR:000001412+'),
     'MATCHED_GATES': '5',
