@@ -136,7 +136,7 @@ def get_iri_short_label_maps(short_rows):
   return ishort_iris, iri_shorts
 
 
-def get_cell_iri_gates(tree):
+def populate_cell_iri_gates(tree):
   """
   Given an XML tree from cl.owl, populate the global maps: synonym_iris, iri_labels, iri_gates,
   and iri_parents.
