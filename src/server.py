@@ -10,7 +10,8 @@ from collections import OrderedDict
 from flask import Flask, request, render_template
 from os import path
 
-import common
+from common import (SharedMapManager, get_suffix_syns_symbs_maps, get_iri_special_label_maps,
+                    get_iri_label_maps, get_iri_exact_label_maps, split_gate)
 
 
 pwd = path.dirname(path.realpath(__file__))
@@ -20,49 +21,51 @@ app = Flask(__name__)
 suffixsymbs = {}
 # OrderedDict mapping suffix synonyms to their standardised suffix name:
 suffixsyns = OrderedDict()
+# Used for managing shared maps:
+mapman = SharedMapManager()
 
 
-def populate_maps():
+def populate_map_manager():
   """
   Read data from various files in the build directory and use it to populate the maps (dicts)
   that will be used by the server.
   """
   def update_main_maps(to_iris={}, from_iris={}):
     # This inner function updates the synonyms_iris map with the contents of to_iris, and the
-    # common.iri_labels map with the contents of from_iris.
-    common.iri_labels.update(from_iris)
+    # iri_labels map with the contents of from_iris.
+    mapman.iri_labels.update(from_iris)
     # to_iris maps labels to lists of iris, so flatten the lists here:
     for key in to_iris:
-      # common.synonym_iris.update({'{}'.format(key): '{}'.format(','.join(to_iris[key]))})
-      common.synonym_iris.update({'{}'.format(key): '{}'.format(to_iris[key][0])})
+      # mapman.synonym_iris.update({'{}'.format(key): '{}'.format(','.join(to_iris[key]))})
+      mapman.synonym_iris.update({'{}'.format(key): '{}'.format(to_iris[key][0])})
 
   # Read suffix symbols and suffix synonyms:
   with open(pwd + '/../build/value-scale.tsv') as f:
     rows = csv.DictReader(f, delimiter='\t')
-    tmp_1, tmp_2 = common.get_suffix_syns_symbs_maps(rows)
+    tmp_1, tmp_2 = get_suffix_syns_symbs_maps(rows)
     suffixsymbs.update(tmp_1)
     suffixsyns .update(tmp_2)
 
-  # Read special gates and update the common.synonym_iris and iris_labels maps
+  # Read special gates and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/special-gates.tsv') as f:
     rows = csv.DictReader(f, delimiter='\t')
-    to_iris, from_iris = common.get_iri_special_label_maps(rows)
+    to_iris, from_iris = get_iri_special_label_maps(rows)
     update_main_maps(to_iris, from_iris)
 
-  # Read PR labels and update the common.synonym_iris and iris_labels maps
+  # Read PR labels and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/pr-labels.tsv') as f:
     rows = csv.reader(f, delimiter='\t')
-    to_iris, from_iris = common.get_iri_label_maps(rows)
+    to_iris, from_iris = get_iri_label_maps(rows)
     update_main_maps(to_iris, from_iris)
 
-  # Read PR synonyms and update the common.synonym_iris and iris_labels maps
+  # Read PR synonyms and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/pr-exact-synonyms.tsv') as f:
     rows = csv.reader(f, delimiter='\t')
-    to_iris = common.get_iri_exact_label_maps(rows)
+    to_iris = get_iri_exact_label_maps(rows)
     update_main_maps(to_iris)
 
   tree = ET.parse(pwd + '/../build/cl.owl')
-  common.populate_cell_iri_gates(tree)
+  mapman.populate_iri_maps(tree)
 
 
 def decorate_gate(kind, level):
@@ -76,15 +79,15 @@ def decorate_gate(kind, level):
     'level_recognized': False,
   }
 
-  if kind in common.iri_labels:
+  if kind in mapman.iri_labels:
     gate['kind_recognized'] = True
-    gate['kind_label'] = common.iri_labels[kind]
+    gate['kind_label'] = mapman.iri_labels[kind]
   if kind and not kind.startswith('http'):
     gate['kind'] = '?gate=' + kind
 
-  if level in common.iri_labels:
+  if level in mapman.iri_labels:
     gate['level_recognized'] = True
-    gate['level_label'] = common.iri_labels[level]
+    gate['level_label'] = mapman.iri_labels[level]
 
   return gate
 
@@ -102,17 +105,17 @@ def process_gate(gate_string):
                            gate_string, flags=re.IGNORECASE)
 
   # The 'kind' is the root of the gate string without the suffix, and the 'level' is the suffix
-  kind_name, level_name = common.split_gate(gate_string, suffixsymbs.values())
+  kind_name, level_name = split_gate(gate_string, suffixsymbs.values())
   # Anything in square brackets should be thought of as a 'comment' and not part of the kind.
   kind_name = re.sub('\s*\[.*\]\s*', '', kind_name)
   kind = None
-  if kind_name.casefold() in common.synonym_iris:
-    kind = common.synonym_iris[kind_name.casefold()]
+  if kind_name.casefold() in mapman.synonym_iris:
+    kind = mapman.synonym_iris[kind_name.casefold()]
   level = None
   if level_name == '':
     level_name = '+'
-  if level_name in common.level_iris:
-    level = common.level_iris[level_name]
+  if level_name in mapman.level_iris:
+    level = mapman.level_iris[level_name]
   gate = {}
 
   has_errors = False
@@ -121,7 +124,7 @@ def process_gate(gate_string):
     has_errors = True
   gate['gate'] = gate_string
   gate['kind_name'] = kind_name
-  gate['level_name'] = common.level_names[level_name]
+  gate['level_name'] = mapman.level_names[level_name]
 
   return gate, has_errors
 
@@ -157,19 +160,19 @@ def get_cell_core_info(cell_gates, cell_iri):
   """
   cell = {'recognized': False, 'conflicts': False, 'has_cell_gates': len(cell_gates) > 0,
           'cell_gates': cell_gates}
-  if cell_iri in common.iri_gates:
+  if cell_iri in mapman.iri_gates:
     # If the cell IRI is in the IRI->Gates map, then add its IRI and flag it as recognised.
     cell['recognized'] = True
     cell['iri'] = cell_iri
-    if cell_iri in common.iri_labels:
+    if cell_iri in mapman.iri_labels:
       # If the cell is in the IRI->Labels map, then add its label
-      cell['label'] = common.iri_labels[cell_iri]
-    if cell_iri in common.iri_parents:
+      cell['label'] = mapman.iri_labels[cell_iri]
+    if cell_iri in mapman.iri_parents:
       # It it is in the IRI->Parents map, then add its parent's IRI
-      cell['parent'] = common.iri_parents[cell_iri]
-      if cell['parent'] in common.iri_labels:
+      cell['parent'] = mapman.iri_parents[cell_iri]
+      if cell['parent'] in mapman.iri_labels:
         # If its parent's IRI is in the IRI->Labels map, then add its parent's label
-        cell['parent_label'] = common.iri_labels[cell['parent']]
+        cell['parent_label'] = mapman.iri_labels[cell['parent']]
 
   return cell
 
@@ -182,10 +185,10 @@ def get_gate_info_for_cell(cell_iri):
   cell_results = []
 
   if cell_iri:
-    for gate in common.iri_gates[cell_iri]:
+    for gate in mapman.iri_gates[cell_iri]:
       gate = decorate_gate(gate['kind'], gate['level'])
-      if gate['level'] in common.iri_levels:
-        gate['level_name'] = common.level_names[common.iri_levels[gate['level']]]
+      if gate['level'] in mapman.iri_levels:
+        gate['level_name'] = mapman.level_names[mapman.iri_levels[gate['level']]]
       cell_results.append(gate)
 
   return cell_results
@@ -195,13 +198,13 @@ def get_cell_iri(cell_name):
   """
   Find the IRI for the cell based on cell_name, which can be a: label/synonym, ID, or IRI.
   """
-  if cell_name.casefold() in common.synonym_iris:
-    cell_iri = common.synonym_iris[cell_name.casefold()]
-  elif cell_name in common.iri_labels:
+  if cell_name.casefold() in mapman.synonym_iris:
+    cell_iri = mapman.synonym_iris[cell_name.casefold()]
+  elif cell_name in mapman.iri_labels:
     cell_iri = cell_name
   else:
     iri = re.sub('^CL:', 'http://purl.obolibrary.org/obo/CL_', cell_name)
-    cell_iri = iri if iri in common.iri_labels else None
+    cell_iri = iri if iri in mapman.iri_labels else None
 
   return cell_iri
 
@@ -298,13 +301,13 @@ if __name__ == '__main__':
   At startup, the main function reads information from files in the build directory and uses it to
   populate our global dictionaries. It then starts the Flask application.
   """
-  populate_maps()
+  populate_map_manager()
   app.debug = True
   app.run()
 
 
 def test_server():
-  populate_maps()
+  populate_map_manager()
   cells_field = 'CD4-positive, alpha-beta T cell & CD19-'
   gates_field = 'CD4-, CD19+, CD20-, CD27++, CD38+-, infected[Dengue virus], CD56[glycosylated]+'
   cell = parse_cells_field(cells_field)

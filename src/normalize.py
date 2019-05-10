@@ -6,7 +6,7 @@ import csv
 import re
 import xml.etree.ElementTree as ET
 
-import common
+from common import SharedMapManager, split_gate, get_suffix_syns_symbs_maps
 
 
 def tokenize(projname, suffixsymbs, suffixsyns, reported):
@@ -145,7 +145,7 @@ def normalize(gates, gate_mappings, special_gates, preferred, symbols):
   ontologized_gates = []
   preferred_label_gates = []
   for gate in gates:
-    label, suffixsymb = common.split_gate(gate, symbols)
+    label, suffixsymb = split_gate(gate, symbols)
     # Get any label / ontology id pairs corresponding to the synonym represented by `gate` from
     # the special_gates dictionary. Note that we match case-insensitively to the special_gates
     # dictionary
@@ -219,7 +219,7 @@ def main():
   # This defines the suffix synonyms and symbols for various scaling indicators,
   # which must be noted during parsing
   rows = csv.DictReader(args.scale, delimiter='\t')
-  suffixsymbs, suffixsyns = common.get_suffix_syns_symbs_maps(rows)
+  suffixsymbs, suffixsyns = get_suffix_syns_symbs_maps(rows)
 
   # Load the contents of the file given by the command-line parameter args.mappings.
   # This file associates gate laels with the ontology ids / keywords with which we populate the
@@ -248,10 +248,11 @@ def main():
     preferred[row['Ontology ID']] = row['Preferred Label']
 
   # Load the contents of the file given by args.cells. This is an OWL file in XML format. We first
-  # parse it using python's xml library, and then call common.populate_cell_iri_gates to populate
-  # the global maps: common.synonym_iris, common.iri_labels, common.iri_gates, and iri_parents
+  # parse it using python's xml library, and then call populate_iri_maps to populate
+  # the shared maps: synonym_iris, iri_labels, iri_gates, and iri_parents
   tree = ET.parse(args.cells)
-  common.populate_cell_iri_gates(tree)
+  mapman = SharedMapManager()
+  mapman.populate_iri_maps(tree)
 
   # Finally, load the contents of the source file, process each row and write the processed row
   # to a new file.
@@ -300,11 +301,11 @@ def main():
       # Determine the CL definition:
       population_gates = []
       cell_type = re.sub('^CL:', 'http://purl.obolibrary.org/obo/CL_', row['CL ID'])
-      if cell_type and cell_type in common.iri_gates:
-        for gate in common.iri_gates[cell_type]:
+      if cell_type and cell_type in mapman.iri_gates:
+        for gate in mapman.iri_gates[cell_type]:
           preferred_label = preferred.get(gate['kind'])
           if preferred_label:
-            population_gates.append(preferred_label + common.iri_levels[gate['level']])
+            population_gates.append(preferred_label + mapman.iri_levels[gate['level']])
       row['CL definition'] = ', '.join(population_gates)
 
       # These will be needed later for determining conflicts:
@@ -326,8 +327,8 @@ def main():
       conflicts = []
       for population_gate in cell_gates:
         for definition_gate in preferized_gates:
-          pgate, plevel = common.split_gate(population_gate, symbols)
-          dgate, dlevel = common.split_gate(definition_gate, symbols)
+          pgate, plevel = split_gate(population_gate, symbols)
+          dgate, dlevel = split_gate(definition_gate, symbols)
           ppos = plevel != '-'
           dpos = dlevel != '-'
           if pgate == dgate and ppos != dpos:
