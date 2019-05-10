@@ -20,6 +20,7 @@ def get_markers(normalized_rows):
     # Extract the tokens, strip their suffixes, and add them to the markers dict.
     tokenized = row['Gating tokenized']
     ontologized = row['Gating mapped to ontologies']
+    # Sanity check to make sure that the number of tokens is the same as the number of ontology ids:
     assert(len(re.split(',\s+', tokenized)) == len(re.split(',\s+', ontologized)))
 
     if tokenized:
@@ -128,19 +129,19 @@ if __name__ == "__main__":
   main()
 
 
-def test_report2():
+def test_report():
   normalized_rows = [
     {'EXPERIMENT_ACCESSION': 'EXP13892',
-     'Gating tokenized': ('Intact_cells; intact_singlets; viable_singlets; CD14-; CD33-; CD3+; '
-                          'CD4+; CD8-; Non-naive_CD4+; CXCR5+'),
+     'Gating tokenized': ('Intact_cells, intact_singlets, viable_singlets, CD14-, CD33-, CD3+, '
+                          'CD4+, CD8-, Non-naive_CD4+, CXCR5+'),
      'NAME': 'HIPC Stanford Project',
-     'Gating preferred definition': ('!Intact_cells; intact_singlets; !viable_singlets; CD14-; '
-                                     'CD33-; !CD3+; CD4+; !CD8-; !Non-naive_CD4+; CXCR5+'),
+     'Gating preferred definition': ('!Intact_cells, intact_singlets, !viable_singlets, CD14-, '
+                                     'CD33-, !CD3+, CD4+, !CD8-, !Non-naive_CD4+, CXCR5+'),
      'POPULATION_DEFNITION_REPORTED': ('Intact cells/intact singlets/viable singlets/CD14-CD33-'
                                        '/CD3+/CD4+CD8-/Non-naive CD4+/CXCR5+'),
-     'Gating mapped to ontologies': ('!Intact_cells; intact_singlets; !viable_singlets; '
-                                     'PR:000001889-; PR:000001892-; !CD3+; PR:000001004+; !CD8-; '
-                                     '!Non-naive_CD4+; PR:000001209+'),
+     'Gating mapped to ontologies': ('!Intact_cells, intact_singlets, !viable_singlets, '
+                                     'PR:000001889-, PR:000001892-, !CD3+, PR:000001004+, !CD8-, '
+                                     '!Non-naive_CD4+, PR:000001209+'),
      'POPULATION_NAME_REPORTED': 'TFH CD4+ T cells',
      'STUDY_ACCESSION': 'SDY478'}
   ]
