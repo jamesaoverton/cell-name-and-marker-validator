@@ -64,8 +64,10 @@ def populate_map_manager():
     to_iris = get_iri_exact_label_maps(rows)
     update_main_maps(to_iris)
 
-  tree = ET.parse(pwd + '/../build/cl.owl')
-  mapman.populate_iri_maps(tree)
+  with open(pwd + '/../build/cl.owl') as f:
+    source = f.read().strip()
+    root = ET.fromstring(source)
+    mapman.populate_iri_maps(root)
 
 
 def decorate_gate(kind, level):

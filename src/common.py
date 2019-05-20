@@ -155,9 +155,9 @@ class SharedMapManager:
     # From IRIs to gates
     self.iri_gates = {}
 
-  def populate_iri_maps(self, tree):
+  def populate_iri_maps(self, root):
     """
-    Given an XML tree from cl.owl, populate the managed maps from/to iris.
+    Given an XML tree root extracted from cl.owl, populate the managed maps from/to iris.
     """
 
     ns = {
@@ -169,7 +169,6 @@ class SharedMapManager:
       'oboInOwl': 'http://www.geneontology.org/formats/oboInOwl#'
     }
 
-    root = tree.getroot()
     obo = 'http://purl.obolibrary.org/obo/'
     rdf_about = '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about'
     rdf_resource = '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}resource'
