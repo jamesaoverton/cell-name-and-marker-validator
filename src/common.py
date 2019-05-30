@@ -190,7 +190,8 @@ class SharedMapManager:
           self.synonym_iris[synonym.text.casefold()] = iri
 
         self.iri_gates[iri] = []
-        for part in child.findall('owl:equivalentClass/owl:Class/owl:intersectionOf/*', ns):
+        # for part in child.findall('owl:equivalentClass/owl:Class/owl:intersectionOf/*', ns):
+        for part in child.findall('rdfs:subClassOf/*', ns):
           if part.tag == rdf_description:
             parent = part.get(rdf_about)
             if parent:
@@ -202,7 +203,7 @@ class SharedMapManager:
             value = part.find('owl:someValuesFrom', ns)
             if value is not None:
               value = value.get(rdf_resource)
-            if value and relation in self.iri_levels:
+            if value and value.startswith(obo + 'PR_') and relation in self.iri_levels:
               gate = {
                 'kind': value,
                 'level': relation

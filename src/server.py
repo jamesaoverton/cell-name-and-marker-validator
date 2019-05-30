@@ -64,7 +64,7 @@ def populate_map_manager():
     to_iris = get_iri_exact_label_maps(rows)
     update_main_maps(to_iris)
 
-  with open(pwd + '/../build/cl.owl') as f:
+  with open(pwd + '/../build/cl-plus.owl') as f:
     source = f.read().strip()
     root = ET.fromstring(source)
     mapman.populate_iri_maps(root)
@@ -332,8 +332,6 @@ def test_server():
       'has_cell_gates': True,
       'iri': 'http://purl.obolibrary.org/obo/CL_0000624',
       'label': 'CD4-positive, alpha-beta T cell',
-      'parent': 'http://purl.obolibrary.org/obo/CL_0000791',
-      'parent_label': 'mature alpha-beta T cell',
       'recognized': True},
     'results': [
       {'conflict': True,
