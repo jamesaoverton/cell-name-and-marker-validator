@@ -330,8 +330,6 @@ def test_server():
       'has_cell_gates': True,
       'iri': 'http://purl.obolibrary.org/obo/CL_0000624',
       'label': 'CD4-positive, alpha-beta T cell',
-      'parent': 'http://purl.obolibrary.org/obo/CL_0000791',
-      'parent_label': 'mature alpha-beta T cell',
       'recognized': True},
     'results': [
       {'conflict': True,
