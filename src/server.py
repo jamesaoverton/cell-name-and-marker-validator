@@ -10,9 +10,8 @@ from collections import OrderedDict
 from flask import Flask, request, render_template
 from os import path
 
-from common import (iri_labels, iri_parents, iri_gates, synonym_iris, level_names, level_iris, iri_levels,
-                    get_suffix_syns_symbs_maps, get_iri_special_label_maps, get_iri_label_maps,
-                    get_iri_exact_label_maps, get_cell_iri_gates, split_gate)
+from common import (SharedMapManager, get_suffix_syns_symbs_maps, get_iri_special_label_maps,
+                    get_iri_label_maps, get_iri_exact_label_maps, split_gate)
 
 
 pwd = path.dirname(path.realpath(__file__))
@@ -22,10 +21,11 @@ app = Flask(__name__)
 suffixsymbs = {}
 # OrderedDict mapping suffix synonyms to their standardised suffix name:
 suffixsyns = OrderedDict()
+# Used for managing shared maps:
+mapman = SharedMapManager()
 
 
-
-def populate_maps():
+def populate_map_manager():
   """
   Read data from various files in the build directory and use it to populate the maps (dicts)
   that will be used by the server.
@@ -33,11 +33,11 @@ def populate_maps():
   def update_main_maps(to_iris={}, from_iris={}):
     # This inner function updates the synonyms_iris map with the contents of to_iris, and the
     # iri_labels map with the contents of from_iris.
-    iri_labels.update(from_iris)
+    mapman.iri_labels.update(from_iris)
     # to_iris maps labels to lists of iris, so flatten the lists here:
     for key in to_iris:
-      #synonym_iris.update({'{}'.format(key): '{}'.format(','.join(to_iris[key]))})
-      synonym_iris.update({'{}'.format(key): '{}'.format(to_iris[key][0])})
+      # mapman.synonym_iris.update({'{}'.format(key): '{}'.format(','.join(to_iris[key]))})
+      mapman.synonym_iris.update({'{}'.format(key): '{}'.format(to_iris[key][0])})
 
   # Read suffix symbols and suffix synonyms:
   with open(pwd + '/../build/value-scale.tsv') as f:
@@ -64,8 +64,10 @@ def populate_maps():
     to_iris = get_iri_exact_label_maps(rows)
     update_main_maps(to_iris)
 
-  tree = ET.parse(pwd + '/../build/cl.owl')
-  get_cell_iri_gates(tree)
+  with open(pwd + '/../build/cl.owl') as f:
+    source = f.read().strip()
+    root = ET.fromstring(source)
+    mapman.populate_iri_maps(root)
 
 
 def decorate_gate(kind, level):
@@ -79,15 +81,15 @@ def decorate_gate(kind, level):
     'level_recognized': False,
   }
 
-  if kind in iri_labels:
+  if kind in mapman.iri_labels:
     gate['kind_recognized'] = True
-    gate['kind_label'] = iri_labels[kind]
+    gate['kind_label'] = mapman.iri_labels[kind]
   if kind and not kind.startswith('http'):
     gate['kind'] = '?gate=' + kind
 
-  if level in iri_labels:
+  if level in mapman.iri_labels:
     gate['level_recognized'] = True
-    gate['level_label'] = iri_labels[level]
+    gate['level_label'] = mapman.iri_labels[level]
 
   return gate
 
@@ -109,13 +111,13 @@ def process_gate(gate_string):
   # Anything in square brackets should be thought of as a 'comment' and not part of the kind.
   kind_name = re.sub('\s*\[.*\]\s*', '', kind_name)
   kind = None
-  if kind_name.casefold() in synonym_iris:
-    kind = synonym_iris[kind_name.casefold()]
+  if kind_name.casefold() in mapman.synonym_iris:
+    kind = mapman.synonym_iris[kind_name.casefold()]
   level = None
   if level_name == '':
     level_name = '+'
-  if level_name in level_iris:
-    level = level_iris[level_name]
+  if level_name in mapman.level_iris:
+    level = mapman.level_iris[level_name]
   gate = {}
 
   has_errors = False
@@ -124,7 +126,7 @@ def process_gate(gate_string):
     has_errors = True
   gate['gate'] = gate_string
   gate['kind_name'] = kind_name
-  gate['level_name'] = level_names[level_name]
+  gate['level_name'] = mapman.level_names[level_name]
 
   return gate, has_errors
 
@@ -160,19 +162,19 @@ def get_cell_core_info(cell_gates, cell_iri):
   """
   cell = {'recognized': False, 'conflicts': False, 'has_cell_gates': len(cell_gates) > 0,
           'cell_gates': cell_gates}
-  if cell_iri in iri_gates:
+  if cell_iri in mapman.iri_gates:
     # If the cell IRI is in the IRI->Gates map, then add its IRI and flag it as recognised.
     cell['recognized'] = True
     cell['iri'] = cell_iri
-    if cell_iri in iri_labels:
+    if cell_iri in mapman.iri_labels:
       # If the cell is in the IRI->Labels map, then add its label
-      cell['label'] = iri_labels[cell_iri]
-    if cell_iri in iri_parents:
+      cell['label'] = mapman.iri_labels[cell_iri]
+    if cell_iri in mapman.iri_parents:
       # It it is in the IRI->Parents map, then add its parent's IRI
-      cell['parent'] = iri_parents[cell_iri]
-      if cell['parent'] in iri_labels:
+      cell['parent'] = mapman.iri_parents[cell_iri]
+      if cell['parent'] in mapman.iri_labels:
         # If its parent's IRI is in the IRI->Labels map, then add its parent's label
-        cell['parent_label'] = iri_labels[cell['parent']]
+        cell['parent_label'] = mapman.iri_labels[cell['parent']]
 
   return cell
 
@@ -185,10 +187,10 @@ def get_gate_info_for_cell(cell_iri):
   cell_results = []
 
   if cell_iri:
-    for gate in iri_gates[cell_iri]:
+    for gate in mapman.iri_gates[cell_iri]:
       gate = decorate_gate(gate['kind'], gate['level'])
-      if gate['level'] in iri_levels:
-        gate['level_name'] = level_names[iri_levels[gate['level']]]
+      if gate['level'] in mapman.iri_levels:
+        gate['level_name'] = mapman.level_names[mapman.iri_levels[gate['level']]]
       cell_results.append(gate)
 
   return cell_results
@@ -198,13 +200,13 @@ def get_cell_iri(cell_name):
   """
   Find the IRI for the cell based on cell_name, which can be a: label/synonym, ID, or IRI.
   """
-  if cell_name.casefold() in synonym_iris:
-    cell_iri = synonym_iris[cell_name.casefold()]
-  elif cell_name in iri_labels:
+  if cell_name.casefold() in mapman.synonym_iris:
+    cell_iri = mapman.synonym_iris[cell_name.casefold()]
+  elif cell_name in mapman.iri_labels:
     cell_iri = cell_name
   else:
     iri = re.sub('^CL:', 'http://purl.obolibrary.org/obo/CL_', cell_name)
-    cell_iri = iri if iri in iri_labels else None
+    cell_iri = iri if iri in mapman.iri_labels else None
 
   return cell_iri
 
@@ -270,7 +272,7 @@ def my_app():
   # initialised to the following default value. Otherwise we get it from the request
   cells_field = 'CD4-positive, alpha-beta T cell & CD19-'
   if 'cells' in request.args:
-    cells_field = request.args['cells'].strip().replace("‘", "'").replace("’","'")
+    cells_field = request.args['cells'].strip().replace("‘", "'").replace("’", "'")
 
   # Parse the cells_field
   cell = parse_cells_field(cells_field)
@@ -279,7 +281,7 @@ def my_app():
   # initialised to the following default value, otherwise get it from the request.
   gates_field = 'CD4-, CD19+, CD20-, CD27++, CD38+-, CD56[glycosylated]+'
   if 'gates' in request.args:
-    gates_field = request.args['gates'].strip().replace("‘", "'").replace("’","'")
+    gates_field = request.args['gates'].strip().replace("‘", "'").replace("’", "'")
 
   # Parse the gates_field
   gating = parse_gates_field(gates_field, cell)
@@ -301,13 +303,13 @@ if __name__ == '__main__':
   At startup, the main function reads information from files in the build directory and uses it to
   populate our global dictionaries. It then starts the Flask application.
   """
-  populate_maps()
+  populate_map_manager()
   app.debug = True
   app.run()
 
 
 def test_server():
-  populate_maps()
+  populate_map_manager()
   cells_field = 'CD4-positive, alpha-beta T cell & CD19-'
   gates_field = 'CD4-, CD19+, CD20-, CD27++, CD38+-, infected[Dengue virus], CD56[glycosylated]+'
   cell = parse_cells_field(cells_field)

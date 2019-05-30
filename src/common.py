@@ -1,48 +1,6 @@
 import re
 from collections import defaultdict, OrderedDict
 
-# The maps below all have names of the form: <from>_<to>.
-
-# From synonyms to IRIs. Note that the keys to this dictionary are always lowercase.
-synonym_iris = {}
-
-# From IRIs to labels
-iri_labels = {
-  'http://purl.obolibrary.org/obo/RO_0002104': 'has plasma membrane part',
-  'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part': 'lacks plasma membrane part',
-  'http://purl.obolibrary.org/obo/cl#has_high_plasma_membrane_amount': 'has high plasma membrane amount',
-  'http://purl.obolibrary.org/obo/cl#has_low_plasma_membrane_amount': 'has low plasma membrane amount'
-}
-
-# From IRIs to parents
-iri_parents = {}
-
-# From IRIs to gates
-iri_gates = {}
-
-# Mapping of suffixes to their names
-level_names = {
-  '++': 'high',
-  '+~': 'medium',
-  '+-': 'low',
-  '+': 'positive',
-  '-': 'negative'
-}
-
-# iri_levels is defined to be the inverse of levels_iri. Note that because both '+~' and '+' in
-# level_iris map to 'http://purl.obolibrary.org/obo/RO_0002104', one needs to be careful in how
-# level_iris is ordered. Dictionary keys are always unique, so when iri_levels is generated, the
-# second instance of 'http://purl.obolibrary.org/obo/RO_0002104' will overwrite the first. So '+'
-# must be added to level_iris last, since that is the one that we want in iri_levels.
-level_iris = OrderedDict([
-  ('++', 'http://purl.obolibrary.org/obo/cl#has_high_plasma_membrane_amount'),
-  ('+~', 'http://purl.obolibrary.org/obo/RO_0002104'),
-  ('+-', 'http://purl.obolibrary.org/obo/cl#has_low_plasma_membrane_amount'),
-  ('+', 'http://purl.obolibrary.org/obo/RO_0002104'),
-  ('-', 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part')
-])
-iri_levels = {v: k for k, v in level_iris.items()}
-
 
 def get_suffix_syns_symbs_maps(rows):
   """
@@ -136,63 +94,6 @@ def get_iri_short_label_maps(short_rows):
   return ishort_iris, iri_shorts
 
 
-def get_cell_iri_gates(tree):
-  """
-  Given an XML tree from cl.owl, return a map from Cell Ontology class IRIs
-  to arrays of gate dictionaries.
-  """
-
-  ns = {
-    'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
-    'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
-    'xsd': 'http://www.w3.org/2001/XMLSchema#',
-    'owl': 'http://www.w3.org/2002/07/owl#',
-    'obo': 'http://purl.obolibrary.org/obo/',
-    'oboInOwl': 'http://www.geneontology.org/formats/oboInOwl#'
-  }
-
-  root = tree.getroot()
-  obo = 'http://purl.obolibrary.org/obo/'
-  rdf_about = '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about'
-  rdf_resource = '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}resource'
-  rdf_description = '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description'
-  rdfs_label = '{http://www.w3.org/2000/01/rdf-schema#}label'
-  owl_restriction = '{http://www.w3.org/2002/07/owl#}Restriction'
-
-  for child in root.findall('owl:Class', ns):
-    iri = None
-    if rdf_about in child.attrib:
-      iri = child.attrib[rdf_about]
-    if iri and iri.startswith(obo + 'CL_'):  # and iri == obo + 'CL_0000624':
-      label = child.findtext(rdfs_label)
-      if label:
-        iri_labels[iri] = label
-        synonym_iris[label.casefold()] = iri
-
-      for synonym in child.findall('oboInOwl:hasExactSynonym', ns):
-        synonym_iris[synonym.text.casefold()] = iri
-
-      iri_gates[iri] = []
-      for part in child.findall('owl:equivalentClass/owl:Class/owl:intersectionOf/*', ns):
-        if part.tag == rdf_description:
-          parent = part.get(rdf_about)
-          if parent:
-            iri_parents[iri] = parent
-        elif part.tag == owl_restriction:
-          relation = part.find('owl:onProperty', ns)
-          if relation is not None:
-            relation = relation.get(rdf_resource)
-          value = part.find('owl:someValuesFrom', ns)
-          if value is not None:
-            value = value.get(rdf_resource)
-          if value and relation in iri_levels:
-            gate = {
-              'kind': value,
-              'level': relation
-            }
-            iri_gates[iri].append(gate)
-
-
 def split_gate(gate, symbols):
   """
   Splits the given gate_string into a gate name and a suffix, based on the given
@@ -206,3 +107,104 @@ def split_gate(gate, symbols):
       return [gate[0:-len(symbol)], symbol]
   # If we get to here then there isn't a suffix.
   return [gate, '']
+
+
+class SharedMapManager:
+  """
+  Manages the maps that are shared across modules. The names of these maps should be of the form:
+  <from>_<to>.
+  """
+  def __init__(self):
+    # Mapping of suffixes to their names
+    self.level_names = {
+      '++': 'high',
+      '+~': 'medium',
+      '+-': 'low',
+      '+': 'positive',
+      '-': 'negative'
+    }
+
+    # iri_levels is defined to be the inverse of levels_iri. Note that because both '+~' and '+' in
+    # level_iris map to 'http://purl.obolibrary.org/obo/RO_0002104', one needs to be careful in how
+    # level_iris is ordered. Dictionary keys are always unique, so when iri_levels is generated, the
+    # second instance of 'http://purl.obolibrary.org/obo/RO_0002104' will overwrite the first. So
+    # '+' must be added to level_iris last, since that is the one that we want in iri_levels.
+    self.level_iris = OrderedDict([
+      ('++', 'http://purl.obolibrary.org/obo/cl#has_high_plasma_membrane_amount'),
+      ('+~', 'http://purl.obolibrary.org/obo/RO_0002104'),
+      ('+-', 'http://purl.obolibrary.org/obo/cl#has_low_plasma_membrane_amount'),
+      ('+', 'http://purl.obolibrary.org/obo/RO_0002104'),
+      ('-', 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part')
+    ])
+    self.iri_levels = {v: k for k, v in self.level_iris.items()}
+
+    # From synonyms to IRIs. Note that the keys to this dictionary are always lowercase.
+    self.synonym_iris = {}
+
+    # From IRIs to labels
+    self.iri_labels = {
+      'http://purl.obolibrary.org/obo/RO_0002104': 'has plasma membrane part',
+      'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part': 'lacks plasma membrane part',
+      'http://purl.obolibrary.org/obo/cl#has_high_plasma_membrane_amount': 'has high plasma membrane amount',
+      'http://purl.obolibrary.org/obo/cl#has_low_plasma_membrane_amount': 'has low plasma membrane amount'
+    }
+
+    # From IRIs to parents
+    self.iri_parents = {}
+
+    # From IRIs to gates
+    self.iri_gates = {}
+
+  def populate_iri_maps(self, root):
+    """
+    Given an XML tree root extracted from cl.owl, populate the managed maps from/to iris.
+    """
+
+    ns = {
+      'rdf': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+      'rdfs': 'http://www.w3.org/2000/01/rdf-schema#',
+      'xsd': 'http://www.w3.org/2001/XMLSchema#',
+      'owl': 'http://www.w3.org/2002/07/owl#',
+      'obo': 'http://purl.obolibrary.org/obo/',
+      'oboInOwl': 'http://www.geneontology.org/formats/oboInOwl#'
+    }
+
+    obo = 'http://purl.obolibrary.org/obo/'
+    rdf_about = '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about'
+    rdf_resource = '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}resource'
+    rdf_description = '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description'
+    rdfs_label = '{http://www.w3.org/2000/01/rdf-schema#}label'
+    owl_restriction = '{http://www.w3.org/2002/07/owl#}Restriction'
+
+    for child in root.findall('owl:Class', ns):
+      iri = None
+      if rdf_about in child.attrib:
+        iri = child.attrib[rdf_about]
+      if iri and iri.startswith(obo + 'CL_'):  # and iri == obo + 'CL_0000624':
+        label = child.findtext(rdfs_label)
+        if label:
+          self.iri_labels[iri] = label
+          self.synonym_iris[label.casefold()] = iri
+
+        for synonym in child.findall('oboInOwl:hasExactSynonym', ns):
+          self.synonym_iris[synonym.text.casefold()] = iri
+
+        self.iri_gates[iri] = []
+        for part in child.findall('owl:equivalentClass/owl:Class/owl:intersectionOf/*', ns):
+          if part.tag == rdf_description:
+            parent = part.get(rdf_about)
+            if parent:
+              self.iri_parents[iri] = parent
+          elif part.tag == owl_restriction:
+            relation = part.find('owl:onProperty', ns)
+            if relation is not None:
+              relation = relation.get(rdf_resource)
+            value = part.find('owl:someValuesFrom', ns)
+            if value is not None:
+              value = value.get(rdf_resource)
+            if value and relation in self.iri_levels:
+              gate = {
+                'kind': value,
+                'level': relation
+              }
+              self.iri_gates[iri].append(gate)
