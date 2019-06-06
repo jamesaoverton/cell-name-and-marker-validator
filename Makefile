@@ -42,6 +42,13 @@ build:
 build/robot.jar:
 	curl -L -o $@ "https://github.com/ontodev/robot/releases/download/v1.4.0/robot.jar"
 
+# Download/unzip the files used for batch validation:
+build/%.dmp: build/taxdmp.zip
+	unzip -d build/ -u $<
+
+build/taxdmp.zip:
+	curl -k -L -o $@ "ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdmp.zip"
+
 
 ### Project Configuration
 #
@@ -139,6 +146,10 @@ build/report.tsv: src/report.py build/normalized.tsv build/pr-labels.tsv build/p
 build/gate-mappings.tsv: build/special-gates.tsv build/pr-exact-synonyms.tsv | build
 	cat $^ | cut -f 1-2 > $@
 
+# Run batch validation
+build/fcsAnalyzed.csv: src/batch_validate.py build/nodes.dmp build/names.dmp
+	$< --clobber --nodes build/nodes.dmp --names build/names.dmp \
+	--fcsAnalyzed SDY113
 
 ### General Tasks
 
@@ -151,6 +162,7 @@ all: build/report.tsv | build
 server: build/pr-labels.tsv build/cl-plus.owl build/value-scale.tsv build/special-gates.tsv build/pr-exact-synonyms.tsv | build
 
 # Run automated tests
+.PHONY: test
 test: build/value-scale.tsv build/special-gates.tsv build/pr-labels.tsv build/pr-exact-synonyms.tsv build/cl-plus.owl
 	pytest src/*.py
 
@@ -166,7 +178,7 @@ pydelint:
 # Remove spreadsheets, keep big PRO OWL file
 .PHONY: clean
 clean:
-	rm -f build/*.tsv
+	rm -f build/*.tsv build/*.csv build/taxdmp.zip build/*.dmp build/gc.prt build/readme.txt
 
 # Remove build directory
 .PHONY: clobber
