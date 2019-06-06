@@ -42,13 +42,9 @@ build:
 build/robot.jar:
 	curl -L -o $@ "https://github.com/ontodev/robot/releases/download/v1.4.0/robot.jar"
 
-# Download/unzip the files used for batch validation:
-build/%.dmp: build/taxdmp.zip
-	unzip -d build/ -u $<
-
-build/taxdmp.zip:
-	curl -k -L -o $@ "ftp://ftp.ncbi.nih.gov/pub/taxonomy/taxdmp.zip"
-
+# File containing general info on various HIPC studies:
+build/HIPC_Studies.tsv:
+	curl -k -L -o $@ "https://www.immport.org/documentation/data/hipc/HIPC_Studies.tsv"
 
 ### Project Configuration
 #
@@ -147,9 +143,9 @@ build/gate-mappings.tsv: build/special-gates.tsv build/pr-exact-synonyms.tsv | b
 	cat $^ | cut -f 1-2 > $@
 
 # Run batch validation
-build/fcsAnalyzed.csv: src/batch_validate.py build/nodes.dmp build/names.dmp
-	$< --clobber --nodes build/nodes.dmp --names build/names.dmp \
-	--fcsAnalyzed SDY113
+build/fcsAnalyzed.csv: src/batch_validate.py build/HIPC_Studies.tsv
+	$< --clobber --studyinfo build/HIPC_Studies.tsv --fcsAnalyzed SDY113
+	mv -f fcsAnalyzed.csv build/
 
 ### General Tasks
 

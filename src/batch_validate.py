@@ -1,59 +1,26 @@
 #!/usr/bin/env python3
 
-# MAKE SURE ALL OF THESE ARE NEEDED
 import argparse
+import csv
 import getpass
 import os.path
-import re
 import requests
 import sys
 import time
 
 
-
-# MY GUESS IS WE WON'T BE USING THESE ...
-def extract_nodes(nodes_file):
-  """
-  Given the NCBI nodes.dmp file handle, return the `parents` dictionary
-  """
-  parents = {}
-  for line in nodes_file:
-    (taxid, parent, other) = re.split('\s*\|\s*', line.strip('|\n\t '), 2)
-    parents[taxid] = parent
-
-  return parents
-
-
-def extract_names(names_file):
-  """
-  Given the NCBI names.dmp file handle, return four dictionaries:
-  `taxid_names`, `scientific_names`, `synonyms`, and `lowercase_names`
-  """
-  taxid_names = {}
-  scientific_names = {}
-  synonyms = {}
-  lowercase_names = {}
-  for line in names_file:
-    (taxid, name, unique, kind) = re.split('\s*\|\s*', line.strip('|\n\t '), 3)
-    if kind == 'scientific name':
-      taxid_names[taxid] = name
-      scientific_names[name] = taxid
-    else:
-      synonyms[name] = taxid
-    lowercase_names[name.lower()] = taxid
-
-  return taxid_names, scientific_names, synonyms, lowercase_names
-
-
-def validate(name, parents, taxid_names, scientific_names, synonyms, lowercase_names):
+def validate_name(name):
   import random
   import string
   N = 10
   return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(N))
 
 
-def write_records(records, headers, outfile, parents, taxid_names, scientific_names,
-                  synonyms, lowercase_names):
+def validate_defn(defn):
+  return validate_name(defn)
+
+
+def write_records(records, headers, outfile, projdesc):
   """
   Writes the given records, for which their keys are given in `headers`, to the given outfile.
   In addition, validate the population name and definition for each record and write the validation
@@ -61,6 +28,7 @@ def write_records(records, headers, outfile, parents, taxid_names, scientific_na
   """
   validated_names = {}
   validated_defns = {}
+
 
   for record in records:
     for header in headers:
@@ -70,10 +38,8 @@ def write_records(records, headers, outfile, parents, taxid_names, scientific_na
     name_key = (record['populationNameReported'], record['populationNamePreferred'])
     if name_key not in validated_names:
       validated_names[name_key] = {
-        'comment_reported': validate(record['populationNameReported'], parents, taxid_names,
-                                     scientific_names, synonyms, lowercase_names),
-        'comment_preferred': validate(record['populationNamePreferred'], parents, taxid_names,
-                                      scientific_names, synonyms, lowercase_names)}
+        'comment_reported': validate_name(record['populationNameReported']),
+        'comment_preferred': validate_name(record['populationNamePreferred'])}
     name_comment_reported = validated_names[name_key]['comment_reported']
     name_comment_preferred = validated_names[name_key]['comment_preferred']
     print('"{}","{}",'.format(name_comment_reported, name_comment_preferred), end='', file=outfile)
@@ -87,11 +53,8 @@ def write_records(records, headers, outfile, parents, taxid_names, scientific_na
     defn_key = (record['populationDefnitionReported'], record['populationDefnitionPreferred'])
     if defn_key not in validated_defns:
       validated_defns[defn_key] = {
-        'comment_reported': validate(record['populationDefnitionReported'], parents, taxid_names,
-                                     scientific_names, synonyms, lowercase_names),
-        'comment_preferred': validate(record['populationDefnitionPreferred'], parents, taxid_names,
-                                      scientific_names, synonyms, lowercase_names)}
-
+        'comment_reported': validate_defn(record['populationDefnitionReported']),
+        'comment_preferred': validate_defn(record['populationDefnitionPreferred'])}
     defn_comment_reported = validated_defns[defn_key]['comment_reported']
     defn_comment_preferred = validated_defns[defn_key]['comment_preferred']
     print('"{}","{}",'.format(defn_comment_reported, defn_comment_preferred), end='', file=outfile)
@@ -120,10 +83,8 @@ def main():
                       help='username for ImmPort API. If unspecified the script will prompt for it')
   parser.add_argument('--password', metavar='PASSWORD', type=str,
                       help='password for ImmPort API. If unspecified the script will prompt for it')
-  parser.add_argument('--nodes', metavar='NODES', type=argparse.FileType('r'), required=True,
-                      help='The NCBI nodes.dmp file')
-  parser.add_argument('--names', metavar='NAMES', type=argparse.FileType('r'), required=True,
-                      help='The NCBI names.dmp file')
+  parser.add_argument('--studyinfo', metavar='TSV', type=argparse.FileType(mode='r', encoding='ISO-8859-1'),
+                      required=True, help='A .tsv file containing general information on various studies')
   parser.add_argument('--clobber', dest='clobber', action='store_true',
                       help='If CSV files exist, overwrite them without prompting')
   parser.add_argument('--fcsAnalyzed', metavar='ID', type=str, nargs='+', required=True,
@@ -149,17 +110,8 @@ def main():
     resp.raise_for_status()
   token = resp.json()['token']
 
-  ##############################################
-  # # Now request data for the given study ids:
-  # print("Extracting NCBI data ...")
-  # parents = extract_nodes(args['nodes'])
-  # taxid_names, scientific_names, synonyms, lowercase_names = extract_names(args['names'])
-  parents = {}
-  taxid_names = {}
-  scientific_names = {}
-  synonyms = {}
-  lowercase_names = {}
-  ##############################################
+  # Read in the information from the file containing general info on studies:
+  studyinfo = csv.DictReader(args['studyinfo'], delimiter='\t')
 
   if os.path.exists('fcsAnalyzed.csv') and args['clobber'] is False:
     reply = input('fcsAnalyzed.csv exists. Do you want really want to overwrite it? (y/n): ')
@@ -175,7 +127,7 @@ def main():
     if resp.status_code != requests.codes.ok:
       resp.raise_for_status()
 
-    # Write the header of the CSV using the data returned:
+    # Write the header of the CSV using the data returned plus extra fields determined on its basis:
     headers = sorted([key for key in resp.json()[0]])
     for header in headers:
       print("{},".format(header), end='', file=outfile)
@@ -189,9 +141,9 @@ def main():
     # Now write the actual data:
     for sid in args['fcsAnalyzed']:
       records = [r for r in resp.json() if r['studyAccession'] == sid]
+      projdesc = [s['Pis'] for s in studyinfo if s['Supporting Data'] == sid][0]
       print("Received {} records for fcsAnalyzed ID: {}".format(len(records), sid))
-      write_records(records, headers, outfile, parents, taxid_names, scientific_names,
-                    synonyms, lowercase_names)
+      write_records(records, headers, outfile, projdesc)
 
   end = time.time()
   print("Processing completed. Total execution time: {0:.2f} seconds.".format(end - start))
