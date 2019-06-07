@@ -143,9 +143,11 @@ build/gate-mappings.tsv: build/special-gates.tsv build/pr-exact-synonyms.tsv | b
 	cat $^ | cut -f 1-2 > $@
 
 # Run batch validation
-build/fcsAnalyzed.csv: src/batch_validate.py build/HIPC_Studies.tsv
-	$< --clobber --studyinfo build/HIPC_Studies.tsv --fcsAnalyzed SDY113
-	mv -f fcsAnalyzed.csv build/
+build/fcsAnalyzed.tsv: src/batch_validate.py build/HIPC_Studies.tsv build/value-scale.tsv
+	$< --clobber --studiesinfo build/HIPC_Studies.tsv --scale build/value-scale.tsv \
+	--mappings build/gate-mappings.tsv --special build/special-gates.tsv \
+	--preferred build/pr-pro-short-labels.tsv --output_dir build/ \
+	--fcsAnalyzed SDY113
 
 ### General Tasks
 

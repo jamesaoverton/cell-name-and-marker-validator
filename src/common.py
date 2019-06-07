@@ -2,6 +2,129 @@ import re
 from collections import defaultdict, OrderedDict
 
 
+def tokenize(projname, suffixsymbs, suffixsyns, reported):
+  """
+  Converts a string describing gates reported in an experiment into a list of standardised tokens
+  corresponding to those gates, which are determined by referencing the lists of suffix symbols and
+  suffix synonyms passed to the function.
+
+  Parameters:
+       projname: the name of the project that reported the gates
+       suffixsyns: OrderedDict mapping suffix synonyms to their standardised suffix name;
+                   e.g. OrderedDict([('high', 'high'), ('hi', 'high'), ('bright', 'high'), etc.])
+       suffixsymbs: dict mapping suffix names to their symbolic suffix representation;
+                    e.g {'medium': '+~', 'negative': '-', etc.}
+       reported: a string describing the gates reported in an experiment
+  """
+
+  # Inner function to determine whether the given project name contains any of the given keywords:
+  def any_in_projname(kwds):
+    return any([kwd in projname for kwd in kwds])
+
+  # Ignore everything to the left of the first colon on a given line.
+  if ': ' in reported:
+    reported = re.sub('^.*:\s+', '', reported)
+
+  # Every project has different types of gates and methods for delimiting gates, so parsing the
+  # reported gates from the source file will in general be different for each project.
+  gates = []
+  if any_in_projname(['LaJolla', 'ARA06', 'Center for Human Immunology', 'Wistar']):
+    # These projects do not use delimiters between gates
+    gates = re.findall('\w+[\-\+]*', reported)
+  elif any_in_projname(['IPIRC', 'Watson', 'Ltest', 'Seattle Biomed']):
+    # For these projects, gates are separated by forward slashes
+    gates = re.split('\/', reported)
+  elif 'Emory' in projname:
+    # Gates are separated by commas followed by whitespace
+    gates = re.split(',\s+', reported)
+  elif 'VRC' in projname:
+    # Gates are separated by a capitalised 'AND', and surrounded by whitespace
+    gates = re.split('\s+AND\s+', reported)
+  elif 'Ertl' in projname:
+    # Gates are separated by a lowercase 'and', and surrounded by whitespace
+    gates = re.split('\s+and\s+', reported)
+  elif 'Stanford' in projname:
+    # First delimit any non-delimited gates with a forward slash. Then all gates will be delimited
+    # by either a forward slash or a comma, followed by whitespace.
+    reported = re.sub(r'([\-\+])(CD\d+|CX\w+\d+|CCR\d)', r'\1/\2', reported)
+    gates = re.split('\/|,\s+', reported)
+  elif 'Baylor' in projname:
+    # First eliminate any duplicate commas. Then separate any occurrences of 'granulocyte' that
+    # are preceded by a space (since these are gates which must be noted). Then delimit any
+    # non-delimited gates using a forward slash. At the end of all of this, gates will be delimited
+    # by either a forward slash or a comma, possibly followed by whitespace.
+    reported = re.sub(',,+', ',', reported)
+    reported = re.sub(' granulocyte', ', granulocyte', reported)
+    reported = re.sub(r'([\-\+])CD(\d)', r'\1/CD\2', reported)
+    gates = re.split('\/|,\s*', reported)
+  elif 'Rochester' in projname:
+    # Gates are delimited either by: (a) forward slashes, (b) semicolons possibly followed by
+    # whitespace.
+    gates = re.split(';+\s*|\/', reported)
+  elif 'Mayo' in projname:
+    # If any 'CD' gates are not delimited by a forward slash, so delimit them; all gates should be
+    # delimited by forward slashes.
+    reported = re.sub(r' CD(\d)', r' /CD\1', reported)
+    gates = re.split('\/', reported)
+  elif 'Improving Kidney' in projname:
+    # Delimit non-delimited gates with a forward slash; all gates should be delimited by
+    # forward slashes
+    reported = re.sub(r'([\-\+])CD(\d)', r'\1/CD\2', reported)
+    gates = re.split('\/', reported)
+  elif 'New York Influenza' in projname:
+    # Make it such that any occurrences of 'high' is followed by a space, then delimit non-delimited
+    # gates with a forward slash; all gates should then be delimited by either a forward slash or a
+    # comma.
+    reported = re.sub('high', 'high ', reported)
+    reported = re.sub(r'([\-\+ ])(CD\d+|CXCR\d|BCL\d|IF\w+|PD\d+|IL\d+|TNFa)', r'\1/\2', reported)
+    gates = re.split('\/|,', reported)
+  elif 'Modeling Viral' in projname:
+    # Gates are separated either by (a) 'AND' surrounded by whitespace, (b) '_AND_', (c) '+'
+    # surrounded by whitespace.
+    gates = re.split('\s+AND\s+|_AND_|\s+\+\s+', reported)
+  elif 'Immunobiology of Aging' in projname:
+    # First delimit non-delimited gates with a forward slash, then all gates will be delimited by
+    # forward slashes.
+    reported = re.sub(r'([\-\+])(CD\d+|Ig\w+)', r'\1/\2', reported)
+    gates = re.split('\/', reported)
+  elif 'Flow Cytometry Analysis' in projname:
+    # First delimit non-delimited gates with a forward slash, then all gates will be delimited by
+    # forward slashes.
+    reported = re.sub(r'(\+|\-)(CD\d+|Ig\w+|IL\d+|IF\w+|TNF\w+|Per\w+)', r'\1/\2', reported)
+    gates = re.split('\/', reported)
+  elif 'ITN019AD' in projname:
+    # Remove any occurrences of "AND R<some number>" which follow a gate. Then replace any
+    # occurrences of the word 'AND' with a space. Then all gates will be delimited by spaces.
+    reported = re.sub('(\s+AND)?\s+R\d+.*$', '', reported)
+    reported = re.sub('\s+AND\s+', ' ', reported)
+    gates = re.split('\s+', reported)
+  else:
+    # By default, any of the following are valid delimiters: a forward slash, a comma possibly
+    # followed by some whitespace, 'AND' or 'and' surrounded by whitespace.
+    gates = re.split('\/|,\s*|\s+AND\s+|\s+and\s+', reported)
+
+  tokenized = []
+  for gate in gates:
+    gate = gate.strip()
+    gate = re.sub('ý', '-', gate)  # Unicode hyphen
+
+    # Suffix synonyms are matched case-insensitively:
+    for suffixsyn in suffixsyns.keys():
+      if gate.casefold().endswith(suffixsyn.casefold()):
+        gate = re.sub('\s*' + re.escape(suffixsyn) + '$', suffixsymbs[suffixsyns[suffixsyn]], gate,
+                      flags=re.IGNORECASE)
+        continue
+
+    gate = re.sub(' ', '_', gate)
+
+    # It may sometimes happen that the gate is empty, for example due to a trailing comma in the
+    # reported field. Ignore any such empty gates.
+    if gate:
+      tokenized.append(gate)
+
+  return tokenized
+
+
 def get_suffix_syns_symbs_maps(rows):
   """
   From the given data rows, extract lists of suffix symbols and suffix synonyms.
@@ -157,7 +280,11 @@ class SharedMapManager:
 
   def populate_iri_maps(self, root):
     """
-    Given an XML tree root extracted from cl.owl, populate the managed maps from/to iris.
+    Given an XML tree root extracted from cl.owl, populate the following maps:
+    - iri_gates
+    - iri_parents
+    - iri_labels
+    - synonym_iris
     """
 
     ns = {
