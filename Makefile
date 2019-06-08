@@ -162,7 +162,7 @@ server: build/pr-labels.tsv build/cl-plus.owl build/value-scale.tsv build/specia
 # Run automated tests
 .PHONY: test
 test: build/value-scale.tsv build/special-gates.tsv build/pr-labels.tsv build/pr-exact-synonyms.tsv build/cl-plus.owl
-	pytest src/*.py
+	pytest-3 src/*.py
 
 # Check python code style
 # || true is appended to force make to ignore the exit code from pycodestyle
@@ -171,7 +171,7 @@ pystyle:
 
 # Run the python delinter
 pydelint:
-	pyflakes src/*.py
+	pyflakes3 src/*.py
 
 # Remove spreadsheets, keep big PRO OWL file
 .PHONY: clean

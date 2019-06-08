@@ -6,7 +6,7 @@ import csv
 import re
 import xml.etree.ElementTree as ET
 
-from common import SharedMapManager, split_gate, get_suffix_syns_symbs_maps, tokenize
+from common import IriMaps, split_gate, tokenize
 
 
 def normalize(gates, gate_mappings, special_gates, preferred, symbols):
@@ -96,7 +96,7 @@ def main():
   # This defines the suffix synonyms and symbols for various scaling indicators,
   # which must be noted during parsing
   rows = csv.DictReader(args.scale, delimiter='\t')
-  suffixsymbs, suffixsyns = get_suffix_syns_symbs_maps(rows)
+  suffixsymbs, suffixsyns = IriMaps.extract_suffix_syns_symbs_maps(rows)
 
   # Load the contents of the file given by the command-line parameter args.mappings.
   # This file associates gate laels with the ontology ids / keywords with which we populate the
@@ -128,7 +128,7 @@ def main():
   # parse it using python's xml library, and then call populate_iri_maps to populate
   # the shared maps: synonym_iris, iri_labels, iri_gates, and iri_parents
   tree = ET.parse(args.cells)
-  mapman = SharedMapManager()
+  mapman = IriMaps()
   mapman.populate_iri_maps(tree)
 
   # Finally, load the contents of the source file, process each row and write the processed row

@@ -4,12 +4,11 @@ import argparse
 import csv
 import getpass
 import os.path
-import re
 import requests
 import sys
 import time
 
-from common import get_suffix_syns_symbs_maps, split_gate, tokenize
+from common import IriMaps, split_gate, tokenize
 
 
 def preferize(gates, gate_mappings, special_gates, preferred, symbols):
@@ -128,12 +127,13 @@ def main():
                       help='username for ImmPort API. If unspecified the script will prompt for it')
   parser.add_argument('--password', metavar='PASSWORD', type=str,
                       help='password for ImmPort API. If unspecified the script will prompt for it')
-  parser.add_argument('--output_dir', metavar='DIR', type=str, help='directory for output TSV files')
+  parser.add_argument('--output_dir', metavar='DIR', type=str,
+                      help='directory for output TSV files')
   parser.add_argument('--clobber', dest='clobber', action='store_true',
                       help='If output TSV files exist, overwrite them without prompting')
 
   required = parser.add_argument_group('required arguments')
-  required.add_argument('--studiesinfo', metavar='TSV', required=True, 
+  required.add_argument('--studiesinfo', metavar='TSV', required=True,
                         type=argparse.FileType(mode='r', encoding='ISO-8859-1'),
                         help='A TSV file containing general information on various studies')
   required.add_argument('--scale', metavar='TSV', required=True, type=argparse.FileType('r'),
@@ -173,7 +173,7 @@ def main():
 
   # Extract the suffix synonyms and symbols from the scale TSV file:
   rows = csv.DictReader(args['scale'], delimiter='\t')
-  suffixsymbs, suffixsyns = get_suffix_syns_symbs_maps(rows)
+  suffixsymbs, suffixsyns = IriMaps.extract_suffix_syns_symbs_maps(rows)
   symbols = suffixsymbs.values()
 
   # Load the contents of the file given by the command-line parameter args.mappings.

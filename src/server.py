@@ -10,8 +10,7 @@ from collections import OrderedDict
 from flask import Flask, request, render_template
 from os import path
 
-from common import (SharedMapManager, get_suffix_syns_symbs_maps, get_iri_special_label_maps,
-                    get_iri_label_maps, get_iri_exact_label_maps, split_gate)
+from common import IriMaps, split_gate
 
 
 pwd = path.dirname(path.realpath(__file__))
@@ -22,10 +21,10 @@ suffixsymbs = {}
 # OrderedDict mapping suffix synonyms to their standardised suffix name:
 suffixsyns = OrderedDict()
 # Used for managing shared maps:
-mapman = SharedMapManager()
+mapman = IriMaps()
 
 
-def populate_map_manager():
+def load_maps():
   """
   Read data from various files in the build directory and use it to populate the maps (dicts)
   that will be used by the server.
@@ -42,26 +41,26 @@ def populate_map_manager():
   # Read suffix symbols and suffix synonyms:
   with open(pwd + '/../build/value-scale.tsv') as f:
     rows = csv.DictReader(f, delimiter='\t')
-    tmp_1, tmp_2 = get_suffix_syns_symbs_maps(rows)
+    tmp_1, tmp_2 = IriMaps.extract_suffix_syns_symbs_maps(rows)
     suffixsymbs.update(tmp_1)
     suffixsyns .update(tmp_2)
 
   # Read special gates and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/special-gates.tsv') as f:
     rows = csv.DictReader(f, delimiter='\t')
-    to_iris, from_iris = get_iri_special_label_maps(rows)
+    to_iris, from_iris = IriMaps.extract_iri_special_label_maps(rows)
     update_main_maps(to_iris, from_iris)
 
   # Read PR labels and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/pr-labels.tsv') as f:
     rows = csv.reader(f, delimiter='\t')
-    to_iris, from_iris = get_iri_label_maps(rows)
+    to_iris, from_iris = IriMaps.extract_iri_label_maps(rows)
     update_main_maps(to_iris, from_iris)
 
   # Read PR synonyms and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/pr-exact-synonyms.tsv') as f:
     rows = csv.reader(f, delimiter='\t')
-    to_iris = get_iri_exact_label_maps(rows)
+    to_iris = IriMaps.extract_iri_exact_label_maps(rows)
     update_main_maps(to_iris)
 
   with open(pwd + '/../build/cl-plus.owl') as f:
@@ -303,13 +302,13 @@ if __name__ == '__main__':
   At startup, the main function reads information from files in the build directory and uses it to
   populate our global dictionaries. It then starts the Flask application.
   """
-  populate_map_manager()
+  load_maps()
   app.debug = True
   app.run()
 
 
 def test_server():
-  populate_map_manager()
+  load_maps()
   cells_field = 'CD4-positive, alpha-beta T cell & CD19-'
   gates_field = 'CD4-, CD19+, CD20-, CD27++, CD38+-, infected[Dengue virus], CD56[glycosylated]+'
   cell = parse_cells_field(cells_field)
