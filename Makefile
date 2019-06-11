@@ -159,19 +159,19 @@ all: build/report.tsv | build
 .PHONY: server
 server: build/pr-labels.tsv build/cl-plus.owl build/value-scale.tsv build/special-gates.tsv build/pr-exact-synonyms.tsv | build
 
-# Run automated tests
+# Run automated tests (make sure pytest is for python version 3)
 .PHONY: test
 test: build/value-scale.tsv build/special-gates.tsv build/pr-labels.tsv build/pr-exact-synonyms.tsv build/cl-plus.owl
-	pytest-3 src/*.py
+	pytest src/*.py
 
 # Check python code style
 # || true is appended to force make to ignore the exit code from pycodestyle
 pystyle:
 	pycodestyle src/*.py | grep -v "indentation is not a multiple of four" || true
 
-# Run the python delinter
+# Run the python delinter (make sure pyflakes is for python version 3)
 pydelint:
-	pyflakes3 src/*.py
+	pyflakes src/*.py
 
 # Remove spreadsheets, keep big PRO OWL file
 .PHONY: clean
