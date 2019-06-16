@@ -253,4 +253,136 @@ if __name__ == "__main__":
 # Unit tests:
 
 def test_validate():
-  pass
+  suffixsymbs = {
+    'high': '++',
+    'medium': '+~',
+    'low': '+-',
+    'positive': '+',
+    'negative': '-'
+  }
+
+  symbols = suffixsymbs.values()
+
+  suffixsyns = {
+    'high': 'high',
+    'hi': 'high',
+    'bright': 'high',
+    'Bright': 'high',
+    'bri': 'high',
+    'br': 'high',
+    '(high)': 'high',
+    'medium': 'medium',
+    'med': 'medium',
+    'intermediate': 'medium',
+    'int': 'medium',
+    '(medium)': 'medium',
+    'low': 'low',
+    'lo': 'low',
+    'LO': 'low',
+    'dim': 'low',
+    'di': 'low',
+    '(low)': 'low',
+    'positive': 'positive',
+    'negative': 'negative'
+  }
+
+  gate_mappings = {
+    'Alexa350': 'http://purl.obolibrary.org/obo/PR_001',
+    'Alexa750': 'http://purl.obolibrary.org/obo/PR_002',
+    'Annexin': 'http://purl.obolibrary.org/obo/PR_003',
+    'B220-_live': 'http://purl.obolibrary.org/obo/PR_004',
+    'CCR7': 'http://purl.obolibrary.org/obo/PR_005',
+    'CD14': 'http://purl.obolibrary.org/obo/PR_006',
+    'CD16': 'http://purl.obolibrary.org/obo/PR_007',
+    'CD19': 'http://purl.obolibrary.org/obo/PR_008',
+    'CD20': 'http://purl.obolibrary.org/obo/PR_009',
+    'CD21': 'http://purl.obolibrary.org/obo/PR_010',
+    'CD24': 'http://purl.obolibrary.org/obo/PR_011',
+    'CD27': 'http://purl.obolibrary.org/obo/PR_012',
+    'CD3': 'http://purl.obolibrary.org/obo/PR_013',
+    'CD33': 'http://purl.obolibrary.org/obo/PR_014',
+    'CD38': 'http://purl.obolibrary.org/obo/PR_015',
+    'CD4': 'http://purl.obolibrary.org/obo/PR_016',
+    'CD44': 'http://purl.obolibrary.org/obo/PR_017',
+    'CD45RA': 'http://purl.obolibrary.org/obo/PR_018',
+    'CD4_T_cells': 'http://purl.obolibrary.org/obo/PR_019',
+    'CD56': 'http://purl.obolibrary.org/obo/PR_020',
+    'CD69': 'http://purl.obolibrary.org/obo/PR_021',
+    'CD8': 'http://purl.obolibrary.org/obo/PR_022',
+    'CD94': 'http://purl.obolibrary.org/obo/PR_023',
+    'CXCR5': 'http://purl.obolibrary.org/obo/PR_024',
+    'doublet_excluded': 'http://purl.obolibrary.org/obo/PR_025',
+    'ICOS': 'http://purl.obolibrary.org/obo/PR_026',
+    'IFNg': 'http://purl.obolibrary.org/obo/PR_027',
+    'IL2': 'http://purl.obolibrary.org/obo/PR_028',
+    'live': 'http://purl.obolibrary.org/obo/PR_029',
+    'Live_cells': 'http://purl.obolibrary.org/obo/PR_030',
+    'Lymph': 'http://purl.obolibrary.org/obo/PR_031',
+    'Lymphocytes': 'http://purl.obolibrary.org/obo/PR_032',
+    'lymphocytes': 'http://purl.obolibrary.org/obo/PR_033',
+    'Michael': 'http://purl.obolibrary.org/obo/PR_034',
+    'NP_tet': 'http://purl.obolibrary.org/obo/PR_035',
+    'PD1': 'http://purl.obolibrary.org/obo/PR_036',
+    'Robert': 'http://purl.obolibrary.org/obo/PR_037',
+    'singlets': 'http://purl.obolibrary.org/obo/PR_038',
+    'small_lymphocyte': 'http://purl.obolibrary.org/obo/PR_039',
+    'SSC': 'http://purl.obolibrary.org/obo/PR_040',
+    'TNFa': 'http://purl.obolibrary.org/obo/PR_041',
+    'Uninfected': 'http://purl.obolibrary.org/obo/PR_042',
+    'viable': 'http://purl.obolibrary.org/obo/PR_043',
+  }
+
+  special_gates = {
+    'Michael': {'Ontology ID': 'PR:034', 'Synonyms': 'mike, mickey, mick',
+                'Toxic Synonym': 'mikey'},
+    'Robert': {'Ontology ID': 'PR:037', 'Synonyms': 'rob, bob, bert',
+               'Toxic Synonym': 'bobert'}
+  }
+
+  preferred = {
+    'http://purl.obolibrary.org/obo/PR_001': 'Axexa350',
+    'http://purl.obolibrary.org/obo/PR_002': 'Alexa750',
+    'http://purl.obolibrary.org/obo/PR_003': 'Annexin',
+    'http://purl.obolibrary.org/obo/PR_004': 'B220-_live',
+    'http://purl.obolibrary.org/obo/PR_005': 'CCR7',
+    'http://purl.obolibrary.org/obo/PR_006': 'CD14',
+    'http://purl.obolibrary.org/obo/PR_007': 'CD16',
+    'http://purl.obolibrary.org/obo/PR_008': 'CD19',
+    'http://purl.obolibrary.org/obo/PR_009': 'CD20',
+    'http://purl.obolibrary.org/obo/PR_010': 'CD21',
+    'http://purl.obolibrary.org/obo/PR_011': 'CD24',
+    'http://purl.obolibrary.org/obo/PR_012': 'CD27',
+    'http://purl.obolibrary.org/obo/PR_013': 'CD3',
+    'http://purl.obolibrary.org/obo/PR_014': 'CD33',
+    'http://purl.obolibrary.org/obo/PR_015': 'CD38',
+    'http://purl.obolibrary.org/obo/PR_016': 'CD4',
+    'http://purl.obolibrary.org/obo/PR_017': 'CD44',
+    'http://purl.obolibrary.org/obo/PR_018': 'CD45RA',
+    'http://purl.obolibrary.org/obo/PR_019': 'CD4_T_cells',
+    'http://purl.obolibrary.org/obo/PR_020': 'CD56',
+    'http://purl.obolibrary.org/obo/PR_021': 'CD69',
+    'http://purl.obolibrary.org/obo/PR_022': 'CD8',
+    'http://purl.obolibrary.org/obo/PR_023': 'CD94',
+    'http://purl.obolibrary.org/obo/PR_024': 'CXCR5',
+    'http://purl.obolibrary.org/obo/PR_025': 'doublet_excluded',
+    'http://purl.obolibrary.org/obo/PR_026': 'ICOS',
+    'http://purl.obolibrary.org/obo/PR_027': 'IFNg',
+    'http://purl.obolibrary.org/obo/PR_028': 'IL2',
+    'http://purl.obolibrary.org/obo/PR_029': 'live',
+    'http://purl.obolibrary.org/obo/PR_030': 'Live_cells',
+    'http://purl.obolibrary.org/obo/PR_031': 'Lymph',
+    'http://purl.obolibrary.org/obo/PR_032': 'Lymphocytes',
+    'http://purl.obolibrary.org/obo/PR_033': 'lymphocytes',
+    'http://purl.obolibrary.org/obo/PR_035': 'NP_tet',
+    'http://purl.obolibrary.org/obo/PR_036': 'PD1',
+    'http://purl.obolibrary.org/obo/PR_038': 'singlets',
+    'http://purl.obolibrary.org/obo/PR_039': 'small_lymphocyte',
+    'http://purl.obolibrary.org/obo/PR_040': 'SSC',
+    'http://purl.obolibrary.org/obo/PR_041': 'TNFa',
+    'http://purl.obolibrary.org/obo/PR_042': 'Uninfected',
+  }
+
+  reported = 'CD14-CD56-CD3+CD4+CD8-CD45RA+CCR7+'
+  preferized = validate(reported, 'LaJolla', suffixsymbs, suffixsyns, gate_mappings, special_gates,
+                        preferred, symbols)
+  assert preferized == 'CD14-, CD56-, CD3+, CD4+, CD8-, CD45RA+, CCR7+'
