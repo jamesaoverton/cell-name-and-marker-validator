@@ -42,6 +42,9 @@ build:
 build/robot.jar:
 	curl -L -o $@ "https://github.com/ontodev/robot/releases/download/v1.4.0/robot.jar"
 
+# File containing general info on various HIPC studies:
+build/HIPC_Studies.tsv:
+	curl -k -L -o $@ "https://www.immport.org/documentation/data/hipc/HIPC_Studies.tsv"
 
 ### Project Configuration
 #
@@ -139,6 +142,12 @@ build/report.tsv: src/report.py build/normalized.tsv build/pr-labels.tsv build/p
 build/gate-mappings.tsv: build/special-gates.tsv build/pr-exact-synonyms.tsv | build
 	cat $^ | cut -f 1-2 > $@
 
+# Run batch validation
+build/fcsAnalyzed.tsv: src/batch_validate.py build/HIPC_Studies.tsv build/value-scale.tsv
+	$< --clobber --studiesinfo build/HIPC_Studies.tsv --scale build/value-scale.tsv \
+	--mappings build/gate-mappings.tsv --special build/special-gates.tsv \
+	--preferred build/pr-pro-short-labels.tsv --output_dir build/ \
+	--fcsAnalyzed SDY113
 
 ### General Tasks
 
@@ -150,7 +159,8 @@ all: build/report.tsv | build
 .PHONY: server
 server: build/pr-labels.tsv build/cl-plus.owl build/value-scale.tsv build/special-gates.tsv build/pr-exact-synonyms.tsv | build
 
-# Run automated tests
+# Run automated tests (make sure pytest is for python version 3)
+.PHONY: test
 test: build/value-scale.tsv build/special-gates.tsv build/pr-labels.tsv build/pr-exact-synonyms.tsv build/cl-plus.owl
 	pytest src/*.py
 
@@ -159,14 +169,14 @@ test: build/value-scale.tsv build/special-gates.tsv build/pr-labels.tsv build/pr
 pystyle:
 	pycodestyle src/*.py | grep -v "indentation is not a multiple of four" || true
 
-# Run the python delinter
+# Run the python delinter (make sure pyflakes is for python version 3)
 pydelint:
 	pyflakes src/*.py
 
 # Remove spreadsheets, keep big PRO OWL file
 .PHONY: clean
 clean:
-	rm -f build/*.tsv
+	rm -f build/*.tsv build/*.csv build/taxdmp.zip build/*.dmp build/gc.prt build/readme.txt
 
 # Remove build directory
 .PHONY: clobber
