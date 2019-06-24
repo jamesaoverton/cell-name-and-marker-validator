@@ -127,6 +127,8 @@ def main():
                       help='username for ImmPort API. If unspecified the script will prompt for it')
   parser.add_argument('--password', metavar='PASSWORD', type=str,
                       help='password for ImmPort API. If unspecified the script will prompt for it')
+  parser.add_argument('--fcsAnalyzed', metavar='ID', type=str, nargs='+',
+                      help='ids of Cytometry studies to validate (e.g., SDY113')
   parser.add_argument('--output_dir', metavar='DIR', type=str,
                       help='directory for output TSV files')
   parser.add_argument('--clobber', dest='clobber', action='store_true',
@@ -144,8 +146,6 @@ def main():
                         help='a TSV file containing extra information about a subset of gates')
   required.add_argument('--preferred', metavar='TSV', required=True, type=argparse.FileType('r'),
                         help='a TSV file which maps ontology ids to preferred labels')
-  required.add_argument('--fcsAnalyzed', metavar='ID', required=True, type=str, nargs='+',
-                        help='ids of Cytometry studies to validate')
 
   args = vars(parser.parse_args())
 
@@ -156,6 +156,12 @@ def main():
   password = args['password']
   if not password:
     password = getpass.getpass('Enter password for API calls to ImmPort: ')
+
+  # If the study IDs have not been specified on the command line, prompt for them:
+  fcsAnalyzed = args['fcsAnalyzed']
+  if not fcsAnalyzed:
+    fcsAnalyzed = input('Enter a list of Cytometry studies to validate (e.g. SDY113) separated by '
+                        'whitespace: ').split()
 
   # Get the start time of the execution for later logging the total elapsed time:
   start = time.time()
@@ -201,7 +207,8 @@ def main():
   for row in rows:
     preferred[row['Ontology ID']] = row['Preferred Label']
 
-  outpath = args['output_dir'] + '/fcsAnalyzed.tsv' if args['output_dir'] else 'fcsAnalyzed.tsv'
+  outpath = 'fcsAnalyzed-' + '-'.join(fcsAnalyzed) + '.tsv'
+  outpath = args['output_dir'] + '/' + outpath if args['output_dir'] else outpath
   outpath = os.path.normpath(outpath)
   if os.path.exists(outpath) and args['clobber'] is False:
     reply = input(outpath + ' exists. Do you want really want to overwrite it? (y/n): ')
@@ -211,7 +218,7 @@ def main():
 
   with open(outpath, 'w') as outfile:
     query = ("https://api.immport.org/data/query/result/fcsAnalyzed?studyAccession={}"
-             .format(','.join(args['fcsAnalyzed'])))
+             .format(','.join(fcsAnalyzed)))
     print("Sending request: " + query)
     resp = requests.get(query, headers={"Authorization": "bearer " + token})
     if resp.status_code != requests.codes.ok:
@@ -235,7 +242,7 @@ def main():
     print("Population definition validations match", file=outfile)
 
     # Now write the actual data:
-    for sid in args['fcsAnalyzed']:
+    for sid in fcsAnalyzed:
       records = [r for r in resp.json() if r['studyAccession'] == sid]
       project = [s['Pis'] for s in studiesinfo if s['Supporting Data'] == sid][0]
       print("Received {} records for fcsAnalyzed ID: {}".format(len(records), sid))
