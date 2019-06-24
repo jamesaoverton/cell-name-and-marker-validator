@@ -176,7 +176,7 @@ pydelint:
 # Remove spreadsheets, keep big PRO OWL file
 .PHONY: clean
 clean:
-	rm -f build/*.tsv build/*.csv build/taxdmp.zip build/*.dmp build/gc.prt build/readme.txt
+	rm -f build/*.tsv build/*.csv build/*.json build/taxdmp.zip build/*.dmp build/gc.prt build/readme.txt
 
 # Remove build directory
 .PHONY: clobber

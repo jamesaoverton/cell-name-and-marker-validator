@@ -3,12 +3,68 @@
 import argparse
 import csv
 import getpass
+import json
 import os.path
 import requests
 import sys
 import time
 
 from common import IriMaps, split_gate, tokenize
+
+
+def get_gate_mappings(mappings_file):
+  rows = csv.DictReader(mappings_file, delimiter='\t')
+  gate_mappings = {}
+  for row in rows:
+    gate_mappings[row['Label']] = row['Ontology ID']
+  return gate_mappings
+
+
+def get_special_gates(special_file):
+  rows = csv.DictReader(special_file, delimiter='\t')
+  special_gates = {}
+  for row in rows:
+    special_gates[row['Label']] = {
+      'Ontology ID': row['Ontology ID'],
+      'Synonyms': row['Synonyms'],
+      'Toxic Synonym': row['toxic synonym']}
+  return special_gates
+
+
+def get_preferred(preferred_file):
+  rows = csv.DictReader(preferred_file, delimiter='\t')
+  preferred = {}
+  for row in rows:
+    preferred[row['Ontology ID']] = row['Preferred Label']
+  return preferred
+
+
+def fetch_immport_data(username, password, sid, jsonpath):
+  """
+  Fetches the data for the given `sid` from ImmPort, caching it in the file at the location
+  `jsonpath` for later reuse before returning the data to the caller.
+  """
+  # Get an authentication token from ImmPort:
+  print("Retrieving authentication token from Immport ...")
+  resp = requests.post('https://auth.immport.org/auth/token',
+                       data={'username': username, 'password': password})
+  if resp.status_code != requests.codes.ok:
+    resp.raise_for_status()
+  token = resp.json()['token']
+
+  # Send the request:
+  query = ("https://api.immport.org/data/query/result/fcsAnalyzed?studyAccession={}".format(sid))
+  print("Sending request: " + query)
+  resp = requests.get(query, headers={"Authorization": "bearer " + token})
+  if resp.status_code != requests.codes.ok:
+    resp.raise_for_status()
+
+  # Save the JSON data from the response, and write it to a file at the location `jsonpath` that
+  # can be reused later if this script is called again.
+  data = resp.json()
+  with open(jsonpath, 'w') as f:
+    json.dump(data, f)
+  return data
 
 
 def preferize(gates, gate_mappings, special_gates, preferred, symbols):
@@ -163,50 +219,7 @@ def main():
     fcsAnalyzed = input('Enter a list of Cytometry studies to validate (e.g. SDY113) separated by '
                         'whitespace: ').split()
 
-  # Get the start time of the execution for later logging the total elapsed time:
-  start = time.time()
-
-  # Get an authentication token from ImmPort:
-  print("Retrieving authentication token from Immport ...")
-  resp = requests.post('https://auth.immport.org/auth/token',
-                       data={'username': username, 'password': password})
-  if resp.status_code != requests.codes.ok:
-    resp.raise_for_status()
-  token = resp.json()['token']
-
-  # Read in the information from the file containing general info on studies:
-  studiesinfo = csv.DictReader(args['studiesinfo'], delimiter='\t')
-
-  # Extract the suffix synonyms and symbols from the scale TSV file:
-  rows = csv.DictReader(args['scale'], delimiter='\t')
-  suffixsymbs, suffixsyns = IriMaps.extract_suffix_syns_symbs_maps(rows)
-  symbols = suffixsymbs.values()
-
-  # Load the contents of the file given by the command-line parameter args.mappings.
-  # This file associates gate laels with the ontology ids
-  rows = csv.DictReader(args['mappings'], delimiter='\t')
-  gate_mappings = {}
-  for row in rows:
-    gate_mappings[row['Label']] = row['Ontology ID']
-
-  # Load the contents of the file given by the command-line parameter args.special.
-  # This file (similary to the args.mapping file) associates certain gate labels with ontology ids
-  # but also contains additional information regarding these gates.
-  rows = csv.DictReader(args['special'], delimiter='\t')
-  special_gates = {}
-  for row in rows:
-    special_gates[row['Label']] = {
-      'Ontology ID': row['Ontology ID'],
-      'Synonyms': row['Synonyms'],
-      'Toxic Synonym': row['toxic synonym']}
-
-  # Load the contents of the file given by the command-line parameter args.preferred.
-  # This file associates ontology ids with preferred gate labels (i.e. pr#PRO-short-label).
-  rows = csv.DictReader(args['preferred'], delimiter='\t')
-  preferred = {}
-  for row in rows:
-    preferred[row['Ontology ID']] = row['Preferred Label']
-
+  # Make sure it is ok to overwrite an existing file:
   outpath = 'fcsAnalyzed-' + '-'.join(fcsAnalyzed) + '.tsv'
   outpath = args['output_dir'] + '/' + outpath if args['output_dir'] else outpath
   outpath = os.path.normpath(outpath)
@@ -216,22 +229,56 @@ def main():
     if reply == 'n':
       sys.exit(1)
 
+  # Get the start time of the execution for later logging the total elapsed time:
+  start = time.time()
+
+  # Read in the information from the file containing general info on studies.
+  studiesinfo = list(csv.DictReader(args['studiesinfo'], delimiter='\t'))
+
+  # Extract the suffix synonyms and symbols from the scale TSV file:
+  rows = csv.DictReader(args['scale'], delimiter='\t')
+  suffixsymbs, suffixsyns = IriMaps.extract_suffix_syns_symbs_maps(rows)
+  symbols = suffixsymbs.values()
+
+  # Load the contents of the file given by the command-line parameter args.mappings.
+  # This file associates gate laels with the ontology ids
+  gate_mappings = get_gate_mappings(args['mappings'])
+
+  # Load the contents of the file given by the command-line parameter args.special.
+  # This file (similary to the args.mapping file) associates certain gate labels with ontology ids
+  # but also contains additional information regarding these gates.
+  special_gates = get_special_gates(args['special'])
+
+  # Load the contents of the file given by the command-line parameter args.preferred.
+  # This file associates ontology ids with preferred gate labels (i.e. pr#PRO-short-label).
+  preferred = get_preferred(args['preferred'])
+
+  # Get the study data from the local filesystem if it is present, otherwise fetch it from ImmPort:
+  data = {}
+  for sid in fcsAnalyzed:
+    jsonpath = "{}.json".format(args['output_dir'] + '/' + sid if args['output_dir'] else sid)
+    jsonpath = os.path.normpath(jsonpath)
+    # Check to see if there is an existing file for this study id. If so, reuse it, otherwise
+    # send an API call to ImmPort to retrieve the data:
+    try:
+      with open(jsonpath) as f:
+        data[sid] = json.load(f)
+        print("Retrieved JSON data for {} from cached file {}".format(sid, jsonpath))
+    except Exception:
+      print("Fetching JSON data for {} from ImmPort".format(sid))
+      data[sid] = fetch_immport_data(username, password, sid, jsonpath)
+
+  if not any([data[sid] for sid in data]):
+    print("No data found")
+    sys.exit(1)
+
+  # Write the header of the output TSV file by using the data returned plus extra fields
+  # determined on its basis. Every sid in the data set should have the same fields, so we can just
+  # use the first one (that has data) to get the header fields from. We can assume that there will
+  # be at least one of these since we checked for this above.
+  first_sid_with_data = [sid for sid in data if data[sid]].pop()
+  headers = sorted([key for key in data[first_sid_with_data][0]])
   with open(outpath, 'w') as outfile:
-    query = ("https://api.immport.org/data/query/result/fcsAnalyzed?studyAccession={}"
-             .format(','.join(fcsAnalyzed)))
-    print("Sending request: " + query)
-    resp = requests.get(query, headers={"Authorization": "bearer " + token})
-    if resp.status_code != requests.codes.ok:
-      resp.raise_for_status()
-
-    # Make sure something came back:
-    data = resp.json()
-    if not data:
-      print("No data returned.")
-      sys.exit(1)
-
-    # Write the header of the TSV using the data returned plus extra fields determined on its basis:
-    headers = sorted([key for key in data[0]])
     for header in headers:
       print("{}".format(header), end='\t', file=outfile)
     print("Validated populationNameReported", end='\t', file=outfile)
@@ -243,9 +290,16 @@ def main():
 
     # Now write the actual data:
     for sid in fcsAnalyzed:
-      records = [r for r in resp.json() if r['studyAccession'] == sid]
-      project = [s['Pis'] for s in studiesinfo if s['Supporting Data'] == sid][0]
-      print("Received {} records for fcsAnalyzed ID: {}".format(len(records), sid))
+      records = data.get(sid)
+      if not records:
+        print("No data found for " + sid)
+        continue
+      try:
+        project = [s['Pis'] for s in studiesinfo if s['Supporting Data'].strip() == sid].pop()
+      except IndexError:
+        print("Could not find project corresponding to {}; skipping".format(sid))
+        continue
+      print("Processing {} records for fcsAnalyzed ID: {}".format(len(records), sid))
       write_records(records, headers, outfile, project, suffixsymbs, suffixsyns,
                     gate_mappings, special_gates, preferred, symbols)
 
