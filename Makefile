@@ -13,8 +13,8 @@
 # - GNU Make <https://www.gnu.org/software/make/>
 # - standard Unix tools: cURL, grep, sed, cut
 # - Python 3
-#   - pytest-3 <https://pytest.org> for running automated tests
-#   - Flask for web server
+# - pytest <https://pytest.org> for running automated tests
+# - Flask for web server
 # - rapper <http://librdf.org/raptor/rapper.html>
 # - Java Runtime Environment 8 or later
 # - ROBOT <http://robot.obolibrary.org>
@@ -161,7 +161,7 @@ server: build/pr-labels.tsv build/cl-plus.owl build/value-scale.tsv build/specia
 
 # Run automated tests (make sure pytest is for python version 3)
 .PHONY: test
-test: build/value-scale.tsv build/special-gates.tsv build/pr-labels.tsv build/pr-exact-synonyms.tsv build/cl-plus.owl
+test:
 	pytest src/*.py
 
 # Check python code style
