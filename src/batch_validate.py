@@ -4,7 +4,7 @@ import argparse
 import csv
 import getpass
 import json
-import os.path
+import os
 import requests
 import sys
 import time
@@ -179,10 +179,6 @@ def main():
   population definition, (b) the result of validating the preferred population definition, (c)
   a comparison of the results of these two validations.''')
 
-  parser.add_argument('--username', metavar='USERNAME', type=str,
-                      help='username for ImmPort API. If unspecified the script will prompt for it')
-  parser.add_argument('--password', metavar='PASSWORD', type=str,
-                      help='password for ImmPort API. If unspecified the script will prompt for it')
   parser.add_argument('--fcsAnalyzed', metavar='ID', type=str, nargs='+',
                       help='ids of Cytometry studies to validate (e.g., SDY113')
   parser.add_argument('--output_dir', metavar='DIR', type=str,
@@ -205,11 +201,11 @@ def main():
 
   args = vars(parser.parse_args())
 
-  # If the username and/or password have not been specified on the command line, prompt for them:
-  username = args['username']
+  # If the username and/or password haven't aren't set in environment variables, prompt for them:
+  username = os.environ.get('IMMPORT_USERNAME')
   if not username:
     username = input("Enter username for API calls to ImmPort: ")
-  password = args['password']
+  password = os.environ.get('IMMPORT_PASSWORD')
   if not password:
     password = getpass.getpass('Enter password for API calls to ImmPort: ')
 
