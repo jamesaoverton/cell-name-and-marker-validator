@@ -39,23 +39,25 @@ def get_preferred(preferred_file):
   return preferred
 
 
-def fetch_immport_data(username, password, sid, jsonpath):
-  """
-  Fetches the data for the given `sid` from ImmPort, caching it in the file at the location
-  `jsonpath` for later reuse before returning the data to the caller.
-  """
+def fetch_auth_token(username, password):
   # Get an authentication token from ImmPort:
   print("Retrieving authentication token from Immport ...")
   resp = requests.post('https://auth.immport.org/auth/token',
                        data={'username': username, 'password': password})
   if resp.status_code != requests.codes.ok:
     resp.raise_for_status()
-  token = resp.json()['token']
+  return resp.json()['token']
 
+
+def fetch_immport_data(auth_token, sid, jsonpath):
+  """
+  Fetches the data for the given `sid` from ImmPort, caching it in the file at the location
+  `jsonpath` for later reuse before returning the data to the caller.
+  """
+  print("Fetching JSON data for {} from ImmPort ...".format(sid))
   # Send the request:
   query = ("https://api.immport.org/data/query/result/fcsAnalyzed?studyAccession={}".format(sid))
-  print("Sending request: " + query)
-  resp = requests.get(query, headers={"Authorization": "bearer " + token})
+  resp = requests.get(query, headers={"Authorization": "bearer " + auth_token})
   if resp.status_code != requests.codes.ok:
     resp.raise_for_status()
 
@@ -251,6 +253,7 @@ def main():
 
   # Get the study data from the local filesystem if it is present, otherwise fetch it from ImmPort:
   data = {}
+  auth_token = None
   for sid in fcsAnalyzed:
     jsonpath = "{}.json".format(args['output_dir'] + '/' + sid if args['output_dir'] else sid)
     jsonpath = os.path.normpath(jsonpath)
@@ -261,8 +264,9 @@ def main():
         data[sid] = json.load(f)
         print("Retrieved JSON data for {} from cached file {}".format(sid, jsonpath))
     except Exception:
-      print("Fetching JSON data for {} from ImmPort".format(sid))
-      data[sid] = fetch_immport_data(username, password, sid, jsonpath)
+      if not auth_token:
+        auth_token = fetch_auth_token(username, password)
+      data[sid] = fetch_immport_data(auth_token, sid, jsonpath)
 
   if not any([data[sid] for sid in data]):
     print("No data found")
@@ -295,7 +299,7 @@ def main():
       except IndexError:
         print("Could not find project corresponding to {}; skipping".format(sid))
         continue
-      print("Processing {} records for fcsAnalyzed ID: {}".format(len(records), sid))
+      print("Processing {} records for fcsAnalyzed ID: {} ...".format(len(records), sid))
       write_records(records, headers, outfile, project, suffixsymbs, suffixsyns,
                     gate_mappings, special_gates, preferred, symbols)
 
