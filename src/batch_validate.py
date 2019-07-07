@@ -41,7 +41,7 @@ def get_preferred(preferred_file):
 
 def fetch_auth_token(username, password):
   # Get an authentication token from ImmPort:
-  print("Retrieving authentication token from Immport ...")
+  print("Retrieving authentication token from ImmPort ...")
   resp = requests.post('https://auth.immport.org/auth/token',
                        data={'username': username, 'password': password})
   if resp.status_code != requests.codes.ok:
@@ -185,6 +185,8 @@ def main():
                       help='ids of Cytometry studies to validate (e.g., SDY113')
   parser.add_argument('--output_dir', metavar='DIR', type=str,
                       help='directory for output TSV files')
+  parser.add_argument('--data_dir', metavar='DIR', type=str,
+                      help='directory for cached data')
   parser.add_argument('--clobber', dest='clobber', action='store_true',
                       help='If output TSV files exist, overwrite them without prompting')
 
@@ -216,6 +218,12 @@ def main():
   if not fcsAnalyzed:
     fcsAnalyzed = input('Enter a list of Cytometry studies to validate (e.g. SDY113) separated by '
                         'whitespace: ').split()
+  if not fcsAnalyzed:
+    print("A list of Cytometry studies is required")
+    sys.exit(1)
+
+  # Convert all of the study ids to uppercase for consistency:
+  fcsAnalyzed = [fc.upper() for fc in fcsAnalyzed]
 
   # Make sure it is ok to overwrite an existing file:
   outpath = 'fcsAnalyzed-' + '-'.join(fcsAnalyzed) + '.tsv'
@@ -255,15 +263,17 @@ def main():
   data = {}
   auth_token = None
   for sid in fcsAnalyzed:
-    jsonpath = "{}.json".format(args['output_dir'] + '/' + sid if args['output_dir'] else sid)
-    jsonpath = os.path.normpath(jsonpath)
+    reldir = '{}/fcsAnalyzed/'.format(args['data_dir'])
+    os.makedirs(reldir, exist_ok=True)
+    jsonpath = os.path.normpath('{}/{}.json'.format(reldir, sid))
     # Check to see if there is an existing file for this study id. If so, reuse it, otherwise
     # send an API call to ImmPort to retrieve the data:
     try:
       with open(jsonpath) as f:
         data[sid] = json.load(f)
         print("Retrieved JSON data for {} from cached file {}".format(sid, jsonpath))
-    except Exception:
+    except FileNotFoundError:
+      print("No cached data for {} found ({} does not exist)".format(sid, jsonpath))
       if not auth_token:
         auth_token = fetch_auth_token(username, password)
       data[sid] = fetch_immport_data(auth_token, sid, jsonpath)
