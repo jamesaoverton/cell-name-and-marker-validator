@@ -5,6 +5,7 @@ import csv
 import getpass
 import json
 import os
+import re
 import requests
 import sys
 import time
@@ -12,7 +13,26 @@ import time
 from common import IriMaps, split_gate, tokenize
 
 
+def get_study_ids(studiesinfo, technique):
+  """
+  Given a list of records containing study information, return those which are instances of the
+  given experimental measurement technique.
+  """
+  study_ids = set()
+  for row in studiesinfo:
+    techniques = row['Experiment Measurement Techniques']
+    if re.search(technique, techniques, flags=re.IGNORECASE):
+      study_ids.add(row['Supporting Data'].strip())
+
+  print("Found {} {} studies: {}".format(len(study_ids), technique, study_ids))
+  return study_ids
+
+
 def get_gate_mappings(mappings_file):
+  """
+  Given a mappings file, return a map which contains, for each row in the file, a mapping from its
+  'Label' column to its 'Ontology ID' column.
+  """
   rows = csv.DictReader(mappings_file, delimiter='\t')
   gate_mappings = {}
   for row in rows:
@@ -21,6 +41,11 @@ def get_gate_mappings(mappings_file):
 
 
 def get_special_gates(special_file):
+  """
+  Given special_file, return a map which contains, for each row in the file, a mapping from its
+  'Label' column to a structure composed of its 'Ontology ID', 'Synonyms', and 'Toxic Synonym'
+  columns.
+  """
   rows = csv.DictReader(special_file, delimiter='\t')
   special_gates = {}
   for row in rows:
@@ -32,6 +57,10 @@ def get_special_gates(special_file):
 
 
 def get_preferred(preferred_file):
+  """
+  Given preferred_file, return a map which contains, for each row in the file, a mapping from its
+  'Ontology ID' column to its 'Preferred Label' column.
+  """
   rows = csv.DictReader(preferred_file, delimiter='\t')
   preferred = {}
   for row in rows:
@@ -40,7 +69,9 @@ def get_preferred(preferred_file):
 
 
 def fetch_auth_token(username, password):
-  # Get an authentication token from ImmPort:
+  """
+  Retrieve an authentication token from ImmPort using the given username and password.
+  """
   print("Retrieving authentication token from ImmPort ...")
   resp = requests.post('https://auth.immport.org/auth/token',
                        data={'username': username, 'password': password})
@@ -212,16 +243,15 @@ def main():
   # Get the start time of the execution for later logging the total elapsed time:
   start = time.time()
 
-  # Since there is only one type of study currently handled by this script, and since it is the
-  # only member of a required mutually exclusive group, this will actually always evaluate to true:
-  if args['fcsAnalyzed']:
-    # TODO: Get this list dynamically:
-    fcsAnalyzed = ['SDY113']
-
   outpath = os.path.normpath(args['output_dir'] + '/fcsAnalyzed.tsv')
 
   # Read in the information from the file containing general info on studies.
   studiesinfo = list(csv.DictReader(args['studiesinfo'], delimiter='\t'))
+
+  # Since there is only one type of study currently handled by this script, and since it is the
+  # only member of a required mutually exclusive group, this will actually always evaluate to true:
+  if args['fcsAnalyzed']:
+    fcsAnalyzed = get_study_ids(studiesinfo, 'Flow Cytometry')
 
   # Extract the suffix synonyms and symbols from the scale TSV file:
   rows = csv.DictReader(args['scale'], delimiter='\t')
