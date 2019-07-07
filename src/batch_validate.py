@@ -227,9 +227,11 @@ def main():
                       help='directory containing cached JSON files')
   # It is arguably silly to have a mutually exclusive group with only one member, but we do this
   # in case we want to add other validation tasks in the future:
-  group = parser.add_mutually_exclusive_group(required=True)
-  group.add_argument('--fcsAnalyzed', dest='fcsAnalyzed', action='store_true',
-                     help='Validate Cytometry studies')
+  required = parser.add_argument_group('required arguments')
+  required.add_argument('--fcsAnalyzed', metavar='SDYID', required=True, nargs='*',
+                        help='List of Flow Cytometry studies to validate separated by whitespace '
+                        '(e.g. SDY74 SDY113). If an empty list is passed to --fcsAnalyzed, all '
+                        'Flow Cytometry studies will be validated')
   args = vars(parser.parse_args())
 
   # If the username and/or password haven't aren't set in environment variables, prompt for them:
@@ -248,10 +250,16 @@ def main():
   # Read in the information from the file containing general info on studies.
   studiesinfo = list(csv.DictReader(args['studiesinfo'], delimiter='\t'))
 
-  # Since there is only one type of study currently handled by this script, and since it is the
-  # only member of a required mutually exclusive group, this will actually always evaluate to true:
-  if args['fcsAnalyzed']:
-    fcsAnalyzed = get_study_ids(studiesinfo, 'Flow Cytometry')
+  # Find all of the Flow Cytometry studies to validate:
+  fcsAnalyzed = get_study_ids(studiesinfo, 'Flow Cytometry')
+  # But validate only those that the user has specified (if none are specified, validate them all):
+  if len(args['fcsAnalyzed']) > 0:
+    print("Validation of {} requested ...".format(args['fcsAnalyzed']))
+    bad_ids = [sid for sid in args['fcsAnalyzed'] if sid not in fcsAnalyzed]
+    fcsAnalyzed = [sid for sid in args['fcsAnalyzed'] if sid in fcsAnalyzed]
+    if bad_ids:
+      print("{} are not Flow Cytometry studies; ignoring ...".format(bad_ids))
+    print("Validating: {} ...".format(fcsAnalyzed))
 
   # Extract the suffix synonyms and symbols from the scale TSV file:
   rows = csv.DictReader(args['scale'], delimiter='\t')
