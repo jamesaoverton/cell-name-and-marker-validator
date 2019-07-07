@@ -39,6 +39,9 @@ SHELL := bash
 build:
 	mkdir $@
 
+cache:
+	mkdir $@
+
 build/robot.jar:
 	curl -L -o $@ "https://github.com/ontodev/robot/releases/download/v1.4.0/robot.jar"
 
@@ -145,11 +148,8 @@ build/gate-mappings.tsv: build/special-gates.tsv build/pr-exact-synonyms.tsv | b
 # Run batch validation
 # Note that if the environment variables IMMPORT_USERNAME and IMMPORT_PASSWORD are not set, then the
 # batch_validate script will prompt for them.
-.PHONY: batch_validate
-batch_validate: build/HIPC_Studies.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv build/pr-pro-short-labels.tsv
-	src/batch_validate.py --clobber --studiesinfo build/HIPC_Studies.tsv --scale build/value-scale.tsv \
-	--mappings build/gate-mappings.tsv --special build/special-gates.tsv \
-	--preferred build/pr-pro-short-labels.tsv --output_dir build/ --data_dir data/
+build/fcsAnalyzed.tsv: src/batch_validate.py build/HIPC_Studies.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv build/pr-pro-short-labels.tsv | build cache
+	$^ $| --fcsAnalyzed
 
 ### General Tasks
 
