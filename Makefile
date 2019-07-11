@@ -46,7 +46,7 @@ build/robot.jar:
 	curl -L -o $@ "https://github.com/ontodev/robot/releases/download/v1.4.0/robot.jar"
 
 # File containing general info on various HIPC studies:
-build/HIPC_Studies.tsv:
+build/HIPC_Studies.tsv: | build
 	curl -k -L -o $@ "https://www.immport.org/documentation/data/hipc/HIPC_Studies.tsv"
 
 ### Project Configuration
@@ -180,7 +180,7 @@ pydelint:
 clean:
 	rm -f build/*.tsv build/*.csv build/*.json build/taxdmp.zip build/*.dmp build/gc.prt build/readme.txt
 
-# Remove build directory
+# Remove build and cache directories
 .PHONY: clobber
 clobber:
-	rm -rf build
+	rm -rf build cache

@@ -28,6 +28,20 @@ def get_study_ids(studiesinfo, technique):
   return study_ids
 
 
+def filter_study_ids(all_ids, requested_ids):
+  """
+  Given the list `all_ids` of available study ids, and the list `requested_ids`, return those in
+  the latter that exist in the former.
+  """
+  print("Validation of {} requested ...".format(requested_ids))
+  bad_ids = [sid for sid in requested_ids if sid not in all_ids]
+  requested_ids = [sid for sid in requested_ids if sid not in bad_ids]
+  if bad_ids:
+    print("{} are not valid studies of this type; ignoring ...".format(bad_ids))
+  print("Validating: {} ...".format(requested_ids))
+  return requested_ids
+
+
 def get_gate_mappings(mappings_file):
   """
   Given a mappings file, return a map which contains, for each row in the file, a mapping from its
@@ -251,15 +265,11 @@ def main():
   studiesinfo = list(csv.DictReader(args['studiesinfo'], delimiter='\t'))
 
   # Find all of the Flow Cytometry studies to validate:
+  print("Validating Flow Cytometry studies")
   fcsAnalyzed = get_study_ids(studiesinfo, 'Flow Cytometry')
-  # But validate only those that the user has specified (if none are specified, validate them all):
+  # But validate only those that the user has requested (if none are specified, validate them all):
   if len(args['fcsAnalyzed']) > 0:
-    print("Validation of {} requested ...".format(args['fcsAnalyzed']))
-    bad_ids = [sid for sid in args['fcsAnalyzed'] if sid not in fcsAnalyzed]
-    fcsAnalyzed = [sid for sid in args['fcsAnalyzed'] if sid in fcsAnalyzed]
-    if bad_ids:
-      print("{} are not Flow Cytometry studies; ignoring ...".format(bad_ids))
-    print("Validating: {} ...".format(fcsAnalyzed))
+    fcsAnalyzed = filter_study_ids(fcsAnalyzed, args['fcsAnalyzed'])
 
   # Extract the suffix synonyms and symbols from the scale TSV file:
   rows = csv.DictReader(args['scale'], delimiter='\t')
@@ -311,13 +321,13 @@ def main():
   headers = sorted([key for key in data[first_sid_with_data][0]])
   with open(outpath, 'w') as outfile:
     for header in headers:
-      print("{}".format(header), end='\t', file=outfile)
-    print("Validated populationNameReported", end='\t', file=outfile)
-    print("Validated populationNamePreferred", end='\t', file=outfile)
-    print("Population name validations match", end='\t', file=outfile)
-    print("Validated populationDefinitionReported", end='\t', file=outfile)
-    print("Validated populationDefinitionPreferred", end='\t', file=outfile)
-    print("Population definition validations match", file=outfile)
+      print('"{}"'.format(header), end='\t', file=outfile)
+    print('"Validated populationNameReported"', end='\t', file=outfile)
+    print('"Validated populationNamePreferred"', end='\t', file=outfile)
+    print('"Population name validations match"', end='\t', file=outfile)
+    print('"Validated populationDefinitionReported"', end='\t', file=outfile)
+    print('"Validated populationDefinitionPreferred"', end='\t', file=outfile)
+    print('"Population definition validations match"', file=outfile)
 
     # Now write the actual data:
     for sid in fcsAnalyzed:
