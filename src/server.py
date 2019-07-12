@@ -2,26 +2,23 @@
 #
 # Use [Flask](http://flask.pocoo.org) to serve a validation page.
 
-import copy
 import csv
 import re
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
+from copy import deepcopy
 from flask import Flask, request, render_template
 from os import path
 
-from common import IriMaps, split_gate
+from common import MapManager, split_gate, extract_iri_special_label_maps, extract_iri_label_maps, \
+  extract_iri_exact_label_maps, extract_suffix_syns_symbs_maps, update_iri_maps_from_owl
 
 
 pwd = path.dirname(path.realpath(__file__))
 app = Flask(__name__)
 
-# dict mapping suffix names to their symbolic suffix representation:
-suffixsymbs = {}
-# OrderedDict mapping suffix synonyms to their standardised suffix name:
-suffixsyns = OrderedDict()
 # Used for managing shared maps:
-mapman = IriMaps()
+mapman = MapManager()
 
 
 def load_maps():
@@ -41,32 +38,33 @@ def load_maps():
   # Read suffix symbols and suffix synonyms:
   with open(pwd + '/../build/value-scale.tsv') as f:
     rows = csv.DictReader(f, delimiter='\t')
-    tmp_1, tmp_2 = IriMaps.extract_suffix_syns_symbs_maps(rows)
-    suffixsymbs.update(tmp_1)
-    suffixsyns .update(tmp_2)
+    tmp_1, tmp_2 = extract_suffix_syns_symbs_maps(rows)
+    mapman.suffixsymbs.update(tmp_1)
+    mapman.suffixsyns.update(tmp_2)
 
   # Read special gates and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/special-gates.tsv') as f:
     rows = csv.DictReader(f, delimiter='\t')
-    to_iris, from_iris = IriMaps.extract_iri_special_label_maps(rows)
+    to_iris, from_iris = extract_iri_special_label_maps(rows)
     update_main_maps(to_iris, from_iris)
 
   # Read PR labels and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/pr-labels.tsv') as f:
     rows = csv.reader(f, delimiter='\t')
-    to_iris, from_iris = IriMaps.extract_iri_label_maps(rows)
+    to_iris, from_iris = extract_iri_label_maps(rows)
     update_main_maps(to_iris, from_iris)
 
   # Read PR synonyms and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/pr-exact-synonyms.tsv') as f:
     rows = csv.reader(f, delimiter='\t')
-    to_iris = IriMaps.extract_iri_exact_label_maps(rows)
+    to_iris = extract_iri_exact_label_maps(rows)
     update_main_maps(to_iris)
 
   with open(pwd + '/../build/cl-plus.owl') as f:
     source = f.read().strip()
     root = ET.fromstring(source)
-    mapman.populate_iri_maps(root)
+    update_iri_maps_from_owl(root, mapman.iri_gates, mapman.iri_parents, mapman.iri_labels,
+                             mapman.synonym_iris)
 
 
 def decorate_gate(kind, level):
@@ -100,15 +98,16 @@ def process_gate(gate_string):
   """
   # If the gate string has a suffix which is a synonym of one of the standard suffixes, then replace
   # it with the standard suffix:
-  for suffix in suffixsyns.keys():
+  for suffix in mapman.suffixsyns.keys():
     if gate_string.casefold().endswith(suffix.casefold()):
-      gate_string = re.sub('\s*' + re.escape(suffix) + '$', suffixsymbs[suffixsyns[suffix]],
+      gate_string = re.sub(r'\s*' + re.escape(suffix) + r'$',
+                           mapman.suffixsymbs[mapman.suffixsyns[suffix]],
                            gate_string, flags=re.IGNORECASE)
 
   # The 'kind' is the root of the gate string without the suffix, and the 'level' is the suffix
-  kind_name, level_name = split_gate(gate_string, suffixsymbs.values())
+  kind_name, level_name = split_gate(gate_string, mapman.suffixsymbs.values())
   # Anything in square brackets should be thought of as a 'comment' and not part of the kind.
-  kind_name = re.sub('\s*\[.*\]\s*', '', kind_name)
+  kind_name = re.sub(r'\s*\[.*\]\s*', r'', kind_name)
   kind = None
   if kind_name.casefold() in mapman.synonym_iris:
     kind = mapman.synonym_iris[kind_name.casefold()]
@@ -138,8 +137,8 @@ def get_cell_name_and_gates(cells_field):
   if '&' in cells_field:
     cells_fields = cells_field.split('&', maxsplit=1)
     # Remove any enclosing quotation marks and collapse extra spaces inside the string:
-    cell_name = re.sub("^(\"|\')|(\"|\')$", '', cells_fields[0].strip())
-    cell_name = re.sub("\s\s+", " ", cell_name)
+    cell_name = re.sub(r"^(\"|\')|(\"|\')$", r'', cells_fields[0].strip())
+    cell_name = re.sub(r"\s\s+", r" ", cell_name)
     cell_gating = cells_fields[1].strip()
 
     if cell_gating:
@@ -252,7 +251,7 @@ def parse_gates_field(gates_field, cell):
         gate['conflict'] = True
         cell_result['conflict'] = True
         cell['core_info']['conflicts'] = True
-        conflict = copy.deepcopy(gate)
+        conflict = deepcopy(gate)
         conflict['cell_level'] = cell_result['level']
         conflict['cell_level_name'] = cell_result['level_name']
         gating['conflicts'].append(conflict)
@@ -365,7 +364,7 @@ def test_server():
     't-cell surface antigen t4/leu-3': 'http://purl.obolibrary.org/obo/PR_000001004',
     't-cell surface glycoprotein cd4': 'http://purl.obolibrary.org/obo/PR_000001004',
     'tcr co-receptor cd8': 'http://purl.obolibrary.org/obo/PR_000025402',
-     'blr2': 'http://purl.obolibrary.org/obo/PR_000001203',
+    'blr2': 'http://purl.obolibrary.org/obo/PR_000001203',
     'c-c chemokine receptor type 7': 'http://purl.obolibrary.org/obo/PR_000001203',
     'c-c ckr-7': 'http://purl.obolibrary.org/obo/PR_000001203',
     'cc-ckr-7': 'http://purl.obolibrary.org/obo/PR_000001203',
@@ -428,8 +427,7 @@ def test_server():
        'level': 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part'}]
   }
 
-  global suffixsymbs
-  suffixsymbs = {
+  mapman.suffixsymbs = {
     'high': '++',
     'intermediate': '+~',
     'low': '+-',
@@ -437,8 +435,7 @@ def test_server():
     'negative': '-'
   }
 
-  global suffixsyns
-  suffixsyns = OrderedDict([
+  mapman.suffixsyns = OrderedDict([
     ('high', 'high'),
     ('bright', 'high'),
     ('hi', 'high'),

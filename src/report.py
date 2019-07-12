@@ -5,7 +5,8 @@ import csv
 import re
 from collections import defaultdict
 
-from common import IriMaps
+from common import extract_iri_special_label_maps, extract_iri_label_maps, \
+  extract_iri_exact_label_maps, extract_iri_short_label_maps
 
 
 def get_markers(normalized_rows):
@@ -21,10 +22,10 @@ def get_markers(normalized_rows):
     tokenized = row['Gating tokenized']
     ontologized = row['Gating mapped to ontologies']
     # Sanity check to make sure that the number of tokens is the same as the number of ontology ids:
-    assert(len(re.split(',\s+', tokenized)) == len(re.split(',\s+', ontologized)))
+    assert(len(re.split(r',\s+', tokenized)) == len(re.split(r',\s+', ontologized)))
 
     if tokenized:
-      gates = re.split(',\s+', tokenized)
+      gates = re.split(r',\s+', tokenized)
       for gate in gates:
         marker = gate.rstrip('+-~')
         markers[marker] += 1
@@ -100,19 +101,19 @@ def main():
 
   # Read the labels file to construct maps from IRIs to labels and vice versa
   label_rows = csv.reader(args.labels, delimiter='\t')
-  ilabel_iris, iri_labels = IriMaps.extract_iri_label_maps(label_rows)
+  ilabel_iris, iri_labels = extract_iri_label_maps(label_rows)
 
   # Read the shorts file to construct maps from IRIs to short labels and vice versa
   short_rows = csv.reader(args.shorts, delimiter='\t')
-  ishort_iris, iri_shorts = IriMaps.extract_iri_short_label_maps(short_rows)
+  ishort_iris, iri_shorts = extract_iri_short_label_maps(short_rows)
 
   # Read the exact labels file to construct maps from IRIs to exact labels and vice versa
   exact_rows = csv.reader(args.exacts, delimiter='\t')
-  iexact_iris = IriMaps.extract_iri_exact_label_maps(exact_rows, ishort_iris)
+  iexact_iris = extract_iri_exact_label_maps(exact_rows, ishort_iris)
 
   # Read the special labels file to construct maps from IRIs to special labels and vice versa
   special_rows = csv.DictReader(args.specials, delimiter='\t')
-  ispecial_iris, iri_specials = IriMaps.extract_iri_special_label_maps(special_rows)
+  ispecial_iris, iri_specials = extract_iri_special_label_maps(special_rows)
 
   with open(args.output, 'w') as output:
     w = csv.writer(output, delimiter='\t', lineterminator='\n')
@@ -160,7 +161,7 @@ def test_report():
     ['http://purl.obolibrary.org/obo/PR_000018304', 'CD4 molecule, signal peptide removed form'],
   ]
 
-  ilabel_iris, iri_labels = IriMaps.extract_iri_label_maps(label_rows)
+  ilabel_iris, iri_labels = extract_iri_label_maps(label_rows)
 
   assert ilabel_iris == {
     'cd33 molecule': ['http://purl.obolibrary.org/obo/PR_000001892'],
@@ -173,6 +174,10 @@ def test_report():
   }
 
   assert iri_labels == {
+    'http://purl.obolibrary.org/obo/RO_0002104': 'has plasma membrane part',
+    'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part': 'lacks plasma membrane part',
+    'http://purl.obolibrary.org/obo/cl#has_high_plasma_membrane_amount': 'has high plasma membrane amount',
+    'http://purl.obolibrary.org/obo/cl#has_low_plasma_membrane_amount': 'has low plasma membrane amount',
     'http://purl.obolibrary.org/obo/PR_000001892': 'CD33 molecule',
     'http://purl.obolibrary.org/obo/PR_000046634': 'myeloid CD33, signal (human)',
     'http://purl.obolibrary.org/obo/PR_000003070': 'CD4 molecule isoform 1 unmodified form',
@@ -188,7 +193,7 @@ def test_report():
     ['http://purl.obolibrary.org/obo/PR_000001004', 'CD4'],
   ]
 
-  ishort_iris, iri_shorts = IriMaps.extract_iri_short_label_maps(short_rows)
+  ishort_iris, iri_shorts = extract_iri_short_label_maps(short_rows)
 
   assert ishort_iris == {
     'cd4': ['http://purl.obolibrary.org/obo/PR_000001004'],
@@ -210,7 +215,7 @@ def test_report():
     ['http://purl.obolibrary.org/obo/PR_000014868', 'CD33 antigen-like 3'],
   ]
 
-  iexact_iris = IriMaps.extract_iri_exact_label_maps(exact_rows, ishort_iris)
+  iexact_iris = extract_iri_exact_label_maps(exact_rows, ishort_iris)
 
   assert iexact_iris == {
     'myeloid cell surface antigen cd33': ['http://purl.obolibrary.org/obo/PR_000001892'],
@@ -229,7 +234,7 @@ def test_report():
      'Ontology ID': 'singlets'},
   ]
 
-  ispecial_iris, iri_specials = IriMaps.extract_iri_special_label_maps(special_rows)
+  ispecial_iris, iri_specials = extract_iri_special_label_maps(special_rows)
 
   assert ispecial_iris == {'': ['intact_singlets'],
                            'intact_cells': ['intact_cells'],

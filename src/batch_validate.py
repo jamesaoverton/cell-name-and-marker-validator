@@ -10,7 +10,7 @@ import requests
 import sys
 import time
 
-from common import IriMaps, split_gate, tokenize
+from common import extract_suffix_syns_symbs_maps, split_gate, tokenize
 
 
 def get_study_ids(studiesinfo, technique):
@@ -273,7 +273,7 @@ def main():
 
   # Extract the suffix synonyms and symbols from the scale TSV file:
   rows = csv.DictReader(args['scale'], delimiter='\t')
-  suffixsymbs, suffixsyns = IriMaps.extract_suffix_syns_symbs_maps(rows)
+  suffixsymbs, suffixsyns = extract_suffix_syns_symbs_maps(rows)
   symbols = suffixsymbs.values()
 
   # Load the contents of the file given by the command-line parameter args.mappings.

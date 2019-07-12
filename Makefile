@@ -155,7 +155,7 @@ build/fcsAnalyzed.tsv: src/batch_validate.py build/HIPC_Studies.tsv build/value-
 
 # Run all the important tasks
 .PHONY: all
-all: build/report.tsv | build
+all: build/report.tsv build/fcsAnalyzed.tsv | build
 
 # Run all the tasks required to run the server
 .PHONY: server
@@ -169,7 +169,7 @@ test:
 # Check python code style
 # || true is appended to force make to ignore the exit code from pycodestyle
 pystyle:
-	pycodestyle src/*.py | grep -v "indentation is not a multiple of four" || true
+	pycodestyle --max-line-length=100 --ignore E129,E126,E121,E111,E114,W504 src/*.py | grep -v "indentation is not a multiple of four" || true
 
 # Run the python delinter (make sure pyflakes is for python version 3)
 pydelint:
@@ -178,7 +178,7 @@ pydelint:
 # Remove spreadsheets, keep big PRO OWL file
 .PHONY: clean
 clean:
-	rm -f build/*.tsv build/*.csv build/*.json build/taxdmp.zip build/*.dmp build/gc.prt build/readme.txt
+	rm -f build/*.tsv
 
 # Remove build and cache directories
 .PHONY: clobber
