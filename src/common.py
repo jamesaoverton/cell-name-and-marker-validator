@@ -348,7 +348,7 @@ def update_iri_maps_from_owl(root, iri_gates={}, iri_parents={}, iri_labels={}, 
   return iri_gates, iri_parents, iri_labels, synonym_iris
 
 
-class MapManager:
+class IriMaps:
   """
   Container for shared IRI maps. Useful when an instance of these maps needs to be shared by
   different disconnected sections of code (e.g. in the server module of this codebase).
