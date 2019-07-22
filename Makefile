@@ -39,11 +39,14 @@ SHELL := bash
 build:
 	mkdir $@
 
+cache:
+	mkdir $@
+
 build/robot.jar:
 	curl -L -o $@ "https://github.com/ontodev/robot/releases/download/v1.4.0/robot.jar"
 
 # File containing general info on various HIPC studies:
-build/HIPC_Studies.tsv:
+build/HIPC_Studies.tsv: | build
 	curl -k -L -o $@ "https://www.immport.org/documentation/data/hipc/HIPC_Studies.tsv"
 
 ### Project Configuration
@@ -143,17 +146,16 @@ build/gate-mappings.tsv: build/special-gates.tsv build/pr-exact-synonyms.tsv | b
 	cat $^ | cut -f 1-2 > $@
 
 # Run batch validation
-.PHONY: batch_validate
-batch_validate: build/HIPC_Studies.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv build/pr-pro-short-labels.tsv
-	src/batch_validate.py --clobber --studiesinfo build/HIPC_Studies.tsv --scale build/value-scale.tsv \
-	--mappings build/gate-mappings.tsv --special build/special-gates.tsv \
-	--preferred build/pr-pro-short-labels.tsv --output_dir build/
+# Note that if the environment variables IMMPORT_USERNAME and IMMPORT_PASSWORD are not set, then the
+# batch_validate script will prompt for them.
+build/fcsAnalyzed.tsv: src/batch_validate.py build/HIPC_Studies.tsv build/value-scale.tsv build/gate-mappings.tsv build/special-gates.tsv build/pr-pro-short-labels.tsv | build cache
+	$^ $| --fcsAnalyzed
 
 ### General Tasks
 
 # Run all the important tasks
 .PHONY: all
-all: build/report.tsv | build
+all: build/report.tsv build/fcsAnalyzed.tsv | build
 
 # Run all the tasks required to run the server
 .PHONY: server
@@ -167,7 +169,7 @@ test:
 # Check python code style
 # || true is appended to force make to ignore the exit code from pycodestyle
 pystyle:
-	pycodestyle src/*.py | grep -v "indentation is not a multiple of four" || true
+	pycodestyle --max-line-length=100 --ignore E129,E126,E121,E111,E114,W504 src/*.py | grep -v "indentation is not a multiple of four" || true
 
 # Run the python delinter (make sure pyflakes is for python version 3)
 pydelint:
@@ -176,9 +178,9 @@ pydelint:
 # Remove spreadsheets, keep big PRO OWL file
 .PHONY: clean
 clean:
-	rm -f build/*.tsv build/*.csv build/*.json build/taxdmp.zip build/*.dmp build/gc.prt build/readme.txt
+	rm -f build/*.tsv
 
-# Remove build directory
+# Remove build and cache directories
 .PHONY: clobber
 clobber:
-	rm -rf build
+	rm -rf build cache

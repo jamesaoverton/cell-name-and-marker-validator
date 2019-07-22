@@ -2,26 +2,23 @@
 #
 # Use [Flask](http://flask.pocoo.org) to serve a validation page.
 
-import copy
 import csv
 import re
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
+from copy import deepcopy
 from flask import Flask, request, render_template
 from os import path
 
-from common import IriMaps, split_gate
+from common import IriMaps, split_gate, extract_iri_special_label_maps, extract_iri_label_maps, \
+  extract_iri_exact_label_maps, extract_suffix_syns_symbs_maps, update_iri_maps_from_owl
 
 
 pwd = path.dirname(path.realpath(__file__))
 app = Flask(__name__)
 
-# dict mapping suffix names to their symbolic suffix representation:
-suffixsymbs = {}
-# OrderedDict mapping suffix synonyms to their standardised suffix name:
-suffixsyns = OrderedDict()
 # Used for managing shared maps:
-mapman = IriMaps()
+irimaps = IriMaps()
 
 
 def load_maps():
@@ -32,41 +29,42 @@ def load_maps():
   def update_main_maps(to_iris={}, from_iris={}):
     # This inner function updates the synonyms_iris map with the contents of to_iris, and the
     # iri_labels map with the contents of from_iris.
-    mapman.iri_labels.update(from_iris)
+    irimaps.iri_labels.update(from_iris)
     # to_iris maps labels to lists of iris, so flatten the lists here:
     for key in to_iris:
-      # mapman.synonym_iris.update({'{}'.format(key): '{}'.format(','.join(to_iris[key]))})
-      mapman.synonym_iris.update({'{}'.format(key): '{}'.format(to_iris[key][0])})
+      # irimaps.synonym_iris.update({'{}'.format(key): '{}'.format(','.join(to_iris[key]))})
+      irimaps.synonym_iris.update({'{}'.format(key): '{}'.format(to_iris[key][0])})
 
   # Read suffix symbols and suffix synonyms:
   with open(pwd + '/../build/value-scale.tsv') as f:
     rows = csv.DictReader(f, delimiter='\t')
-    tmp_1, tmp_2 = IriMaps.extract_suffix_syns_symbs_maps(rows)
-    suffixsymbs.update(tmp_1)
-    suffixsyns .update(tmp_2)
+    tmp_1, tmp_2 = extract_suffix_syns_symbs_maps(rows)
+    irimaps.suffixsymbs.update(tmp_1)
+    irimaps.suffixsyns.update(tmp_2)
 
   # Read special gates and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/special-gates.tsv') as f:
     rows = csv.DictReader(f, delimiter='\t')
-    to_iris, from_iris = IriMaps.extract_iri_special_label_maps(rows)
+    to_iris, from_iris = extract_iri_special_label_maps(rows)
     update_main_maps(to_iris, from_iris)
 
   # Read PR labels and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/pr-labels.tsv') as f:
     rows = csv.reader(f, delimiter='\t')
-    to_iris, from_iris = IriMaps.extract_iri_label_maps(rows)
+    to_iris, from_iris = extract_iri_label_maps(rows)
     update_main_maps(to_iris, from_iris)
 
   # Read PR synonyms and update the synonym_iris and iris_labels maps
   with open(pwd + '/../build/pr-exact-synonyms.tsv') as f:
     rows = csv.reader(f, delimiter='\t')
-    to_iris = IriMaps.extract_iri_exact_label_maps(rows)
+    to_iris = extract_iri_exact_label_maps(rows)
     update_main_maps(to_iris)
 
   with open(pwd + '/../build/cl-plus.owl') as f:
     source = f.read().strip()
     root = ET.fromstring(source)
-    mapman.populate_iri_maps(root)
+    update_iri_maps_from_owl(root, irimaps.iri_gates, irimaps.iri_parents, irimaps.iri_labels,
+                             irimaps.synonym_iris)
 
 
 def decorate_gate(kind, level):
@@ -80,15 +78,15 @@ def decorate_gate(kind, level):
     'level_recognized': False,
   }
 
-  if kind in mapman.iri_labels:
+  if kind in irimaps.iri_labels:
     gate['kind_recognized'] = True
-    gate['kind_label'] = mapman.iri_labels[kind]
+    gate['kind_label'] = irimaps.iri_labels[kind]
   if kind and not kind.startswith('http'):
     gate['kind'] = '?gate=' + kind
 
-  if level in mapman.iri_labels:
+  if level in irimaps.iri_labels:
     gate['level_recognized'] = True
-    gate['level_label'] = mapman.iri_labels[level]
+    gate['level_label'] = irimaps.iri_labels[level]
 
   return gate
 
@@ -100,23 +98,24 @@ def process_gate(gate_string):
   """
   # If the gate string has a suffix which is a synonym of one of the standard suffixes, then replace
   # it with the standard suffix:
-  for suffix in suffixsyns.keys():
+  for suffix in irimaps.suffixsyns.keys():
     if gate_string.casefold().endswith(suffix.casefold()):
-      gate_string = re.sub('\s*' + re.escape(suffix) + '$', suffixsymbs[suffixsyns[suffix]],
+      gate_string = re.sub(r'\s*' + re.escape(suffix) + r'$',
+                           irimaps.suffixsymbs[irimaps.suffixsyns[suffix]],
                            gate_string, flags=re.IGNORECASE)
 
   # The 'kind' is the root of the gate string without the suffix, and the 'level' is the suffix
-  kind_name, level_name = split_gate(gate_string, suffixsymbs.values())
+  kind_name, level_name = split_gate(gate_string, irimaps.suffixsymbs.values())
   # Anything in square brackets should be thought of as a 'comment' and not part of the kind.
-  kind_name = re.sub('\s*\[.*\]\s*', '', kind_name)
+  kind_name = re.sub(r'\s*\[.*\]\s*', r'', kind_name)
   kind = None
-  if kind_name.casefold() in mapman.synonym_iris:
-    kind = mapman.synonym_iris[kind_name.casefold()]
+  if kind_name.casefold() in irimaps.synonym_iris:
+    kind = irimaps.synonym_iris[kind_name.casefold()]
   level = None
   if level_name == '':
     level_name = '+'
-  if level_name in mapman.level_iris:
-    level = mapman.level_iris[level_name]
+  if level_name in irimaps.level_iris:
+    level = irimaps.level_iris[level_name]
   gate = {}
 
   has_errors = False
@@ -125,7 +124,7 @@ def process_gate(gate_string):
     has_errors = True
   gate['gate'] = gate_string
   gate['kind_name'] = kind_name
-  gate['level_name'] = mapman.level_names[level_name]
+  gate['level_name'] = irimaps.level_names[level_name]
 
   return gate, has_errors
 
@@ -138,8 +137,8 @@ def get_cell_name_and_gates(cells_field):
   if '&' in cells_field:
     cells_fields = cells_field.split('&', maxsplit=1)
     # Remove any enclosing quotation marks and collapse extra spaces inside the string:
-    cell_name = re.sub("^(\"|\')|(\"|\')$", '', cells_fields[0].strip())
-    cell_name = re.sub("\s\s+", " ", cell_name)
+    cell_name = re.sub(r"^(\"|\')|(\"|\')$", r'', cells_fields[0].strip())
+    cell_name = re.sub(r"\s\s+", r" ", cell_name)
     cell_gating = cells_fields[1].strip()
 
     if cell_gating:
@@ -161,19 +160,19 @@ def get_cell_core_info(cell_gates, cell_iri):
   """
   cell = {'recognized': False, 'conflicts': False, 'has_cell_gates': len(cell_gates) > 0,
           'cell_gates': cell_gates}
-  if cell_iri in mapman.iri_gates:
+  if cell_iri in irimaps.iri_gates:
     # If the cell IRI is in the IRI->Gates map, then add its IRI and flag it as recognised.
     cell['recognized'] = True
     cell['iri'] = cell_iri
-    if cell_iri in mapman.iri_labels:
+    if cell_iri in irimaps.iri_labels:
       # If the cell is in the IRI->Labels map, then add its label
-      cell['label'] = mapman.iri_labels[cell_iri]
-    if cell_iri in mapman.iri_parents:
+      cell['label'] = irimaps.iri_labels[cell_iri]
+    if cell_iri in irimaps.iri_parents:
       # It it is in the IRI->Parents map, then add its parent's IRI
-      cell['parent'] = mapman.iri_parents[cell_iri]
-      if cell['parent'] in mapman.iri_labels:
+      cell['parent'] = irimaps.iri_parents[cell_iri]
+      if cell['parent'] in irimaps.iri_labels:
         # If its parent's IRI is in the IRI->Labels map, then add its parent's label
-        cell['parent_label'] = mapman.iri_labels[cell['parent']]
+        cell['parent_label'] = irimaps.iri_labels[cell['parent']]
 
   return cell
 
@@ -186,10 +185,10 @@ def get_gate_info_for_cell(cell_iri):
   cell_results = []
 
   if cell_iri:
-    for gate in mapman.iri_gates[cell_iri]:
+    for gate in irimaps.iri_gates[cell_iri]:
       gate = decorate_gate(gate['kind'], gate['level'])
-      if gate['level'] in mapman.iri_levels:
-        gate['level_name'] = mapman.level_names[mapman.iri_levels[gate['level']]]
+      if gate['level'] in irimaps.iri_levels:
+        gate['level_name'] = irimaps.level_names[irimaps.iri_levels[gate['level']]]
       cell_results.append(gate)
 
   return cell_results
@@ -199,13 +198,13 @@ def get_cell_iri(cell_name):
   """
   Find the IRI for the cell based on cell_name, which can be a: label/synonym, ID, or IRI.
   """
-  if cell_name.casefold() in mapman.synonym_iris:
-    cell_iri = mapman.synonym_iris[cell_name.casefold()]
-  elif cell_name in mapman.iri_labels:
+  if cell_name.casefold() in irimaps.synonym_iris:
+    cell_iri = irimaps.synonym_iris[cell_name.casefold()]
+  elif cell_name in irimaps.iri_labels:
     cell_iri = cell_name
   else:
     iri = re.sub('^CL:', 'http://purl.obolibrary.org/obo/CL_', cell_name)
-    cell_iri = iri if iri in mapman.iri_labels else None
+    cell_iri = iri if iri in irimaps.iri_labels else None
 
   return cell_iri
 
@@ -252,7 +251,7 @@ def parse_gates_field(gates_field, cell):
         gate['conflict'] = True
         cell_result['conflict'] = True
         cell['core_info']['conflicts'] = True
-        conflict = copy.deepcopy(gate)
+        conflict = deepcopy(gate)
         conflict['cell_level'] = cell_result['level']
         conflict['cell_level_name'] = cell_result['level_name']
         gating['conflicts'].append(conflict)
@@ -308,7 +307,7 @@ if __name__ == '__main__':
 
 
 def test_server():
-  mapman.synonym_iris = {
+  irimaps.synonym_iris = {
     'b-cell differentiation antigen ly-44': 'http://purl.obolibrary.org/obo/PR_000001289',
     'b-cell surface antigen cd20': 'http://purl.obolibrary.org/obo/PR_000001289',
     'b-lymphocyte antigen cd20': 'http://purl.obolibrary.org/obo/PR_000001289',
@@ -365,7 +364,7 @@ def test_server():
     't-cell surface antigen t4/leu-3': 'http://purl.obolibrary.org/obo/PR_000001004',
     't-cell surface glycoprotein cd4': 'http://purl.obolibrary.org/obo/PR_000001004',
     'tcr co-receptor cd8': 'http://purl.obolibrary.org/obo/PR_000025402',
-     'blr2': 'http://purl.obolibrary.org/obo/PR_000001203',
+    'blr2': 'http://purl.obolibrary.org/obo/PR_000001203',
     'c-c chemokine receptor type 7': 'http://purl.obolibrary.org/obo/PR_000001203',
     'c-c ckr-7': 'http://purl.obolibrary.org/obo/PR_000001203',
     'cc-ckr-7': 'http://purl.obolibrary.org/obo/PR_000001203',
@@ -380,7 +379,7 @@ def test_server():
     'mip-3 beta receptor': 'http://purl.obolibrary.org/obo/PR_000001203',
   }
 
-  mapman.iri_labels = {
+  irimaps.iri_labels = {
     'http://purl.obolibrary.org/obo/CL_0001044': 'effector CD4-positive, alpha-beta T cell',
     'http://purl.obolibrary.org/obo/PR_000001004': 'CD4 molecule',
     'http://purl.obolibrary.org/obo/RO_0002104': 'has plasma membrane part',
@@ -399,9 +398,9 @@ def test_server():
     'http://purl.obolibrary.org/obo/PR_000001289': 'membrane-spanning 4-domains subfamily A member 1',
   }
 
-  mapman.iri_parents = {}
+  irimaps.iri_parents = {}
 
-  mapman.iri_gates = {
+  irimaps.iri_gates = {
     'http://purl.obolibrary.org/obo/CL_0001044': [
       {'kind': 'http://purl.obolibrary.org/obo/PR_000001004',
        'level': 'http://purl.obolibrary.org/obo/RO_0002104'},
@@ -428,8 +427,7 @@ def test_server():
        'level': 'http://purl.obolibrary.org/obo/cl#lacks_plasma_membrane_part'}]
   }
 
-  global suffixsymbs
-  suffixsymbs = {
+  irimaps.suffixsymbs = {
     'high': '++',
     'intermediate': '+~',
     'low': '+-',
@@ -437,8 +435,7 @@ def test_server():
     'negative': '-'
   }
 
-  global suffixsyns
-  suffixsyns = OrderedDict([
+  irimaps.suffixsyns = OrderedDict([
     ('high', 'high'),
     ('bright', 'high'),
     ('hi', 'high'),

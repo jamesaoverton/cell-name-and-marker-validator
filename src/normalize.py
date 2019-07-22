@@ -6,7 +6,8 @@ import csv
 import re
 import xml.etree.ElementTree as ET
 
-from common import IriMaps, split_gate, tokenize
+from common import get_iri_levels, extract_suffix_syns_symbs_maps, split_gate, tokenize, \
+  update_iri_maps_from_owl
 
 
 def normalize(gates, gate_mappings, special_gates, preferred, symbols):
@@ -96,7 +97,7 @@ def main():
   # This defines the suffix synonyms and symbols for various scaling indicators,
   # which must be noted during parsing
   rows = csv.DictReader(args.scale, delimiter='\t')
-  suffixsymbs, suffixsyns = IriMaps.extract_suffix_syns_symbs_maps(rows)
+  suffixsymbs, suffixsyns = extract_suffix_syns_symbs_maps(rows)
 
   # Load the contents of the file given by the command-line parameter args.mappings.
   # This file associates gate laels with the ontology ids / keywords with which we populate the
@@ -125,11 +126,10 @@ def main():
     preferred[row['Ontology ID']] = row['Preferred Label']
 
   # Load the contents of the file given by args.cells. This is an OWL file in XML format. We first
-  # parse it using python's xml library, and then call populate_iri_maps to populate
-  # the shared maps: synonym_iris, iri_labels, iri_gates, and iri_parents
+  # parse it using python's xml library, and then call update_iri_maps_from_owl
+  # to retrieve the maps: synonym_iris, iri_labels, iri_gates, and iri_parents
   tree = ET.parse(args.cells)
-  mapman = IriMaps()
-  mapman.populate_iri_maps(tree)
+  iri_gates, iri_parents, iri_labels, synonym_iris = update_iri_maps_from_owl(tree)
 
   # Finally, load the contents of the source file, process each row and write the processed row
   # to a new file.
@@ -178,11 +178,11 @@ def main():
       # Determine the CL definition:
       population_gates = []
       cell_type = re.sub('^CL:', 'http://purl.obolibrary.org/obo/CL_', row['CL ID'])
-      if cell_type and cell_type in mapman.iri_gates:
-        for gate in mapman.iri_gates[cell_type]:
+      if cell_type and cell_type in iri_gates:
+        for gate in iri_gates[cell_type]:
           preferred_label = preferred.get(gate['kind'])
           if preferred_label:
-            population_gates.append(preferred_label + mapman.iri_levels[gate['level']])
+            population_gates.append(preferred_label + get_iri_levels()[gate['level']])
       row['CL definition'] = ', '.join(population_gates)
 
       # These will be needed later for determining conflicts:
