@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="mt-3">Validator Instructions</h1>
+
+<p class="lead">
+  Please follow these instructions to fill out the cell name and marker template.
+</p>
+
+<h2 id="required-columns">Required Columns</h2>
+
+<p>
+  These two columns are always required for every row:
+  <ul>
+    <li>Cell Population Name</li>
+    <li>Gating Definition</li>
+  </ul>
+  Other columns may be included, but they will be ignored by the validator.
+</p>
+
+<h2 id="cell-population-name">1. Cell Population Name</h2>
+
+<p>
+  The cell population name is the cell type from the <a href="/terminology/co/">Cell Ontology</a>
+</p>
+
+<h2 id="gating-definition">2. Gating Definition</h2>
+
+<p>
+  The gating definition is a list of comma-separated gates from the <a href="/terminology/pro">Protein Ontology</a> or our <a href="https://docs.google.com/spreadsheets/d/1jCieXeH_T83d0K3n_3W8QFiCrN4AASw5FlP0nezPhOI/edit?usp=sharing">Special Gates</a>.
+</p>
+{% endblock %}

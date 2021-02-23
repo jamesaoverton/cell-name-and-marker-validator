@@ -13,10 +13,24 @@ There are two ways to use this code:
 
 See the [`Makefile`](Makefile) for software requirements and build tasks.
 
+First, install requirements (optionally, use a virtual environment):
+```
+python3 -m pip install -r requirements.txt
+```
+
+Then, `make` all dependencies:
+```
+make all
+```
+
+The first time you run this, it must download the full Protein Ontology which can take some time. Subsequent builds with an existing `build/` directory will be faster.
+
 ### Web Service
 
-The [`src/server.py`](src/server.py) script will run a simple web service allowing users to submit their cell type and gating strategy and get a validation result immediately. It uses the Python [Flask](http://flask.pocoo.org) module. The `make server` task will prepare the various tables and ontologies required for the server, then run `python3 src/server.py` and navigate to `http://localhost:5000`.
+Once dependencies are complete (see above), navigate to the `src/server` directory, set the `FLASK_APP` variable, and start the server:
 
-### Batch Processing
-
-Supply a `source.tsv` file with columns: NAME, STUDY_ACCESSION, EXPERIMENT_ACCESSION, POPULATION_NAME_REPORTED, POPULATION_DEFNITION_REPORTED [sic]. Then run `make all` and look at `build/normalized.tsv`, `build/report2.tsv`, and `build/summary.tsv`.
+```
+cd src/server
+export FLASK_APP=run.py
+flask run
+```
