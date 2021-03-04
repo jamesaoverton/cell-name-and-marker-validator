@@ -168,6 +168,19 @@ pystyle:
 pydelint:
 	pyflakes src/*.py
 
+test: build/valid-out.tsv build/invalid-out.tsv
+
+build/empty.tsv: | build
+	touch $@
+
+build/valid-out.tsv: src/validate.py build/cell.tsv build/cl-levels.tsv build/marker.tsv examples/valid.tsv | build build/empty.tsv
+	python3 $^ > $@
+	diff build/valid-out.tsv build/empty.tsv
+
+build/invalid-out.tsv: src/validate.py build/cell.tsv build/cl-levels.tsv build/marker.tsv examples/invalid.tsv | build
+	python3 $^ > $@
+	[ -s $@ ]
+
 # Remove spreadsheets, keep big PRO OWL file
 .PHONY: clean
 clean:

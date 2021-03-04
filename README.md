@@ -27,10 +27,26 @@ The first time you run this, it must download the full Protein Ontology which ca
 
 ### Web Service
 
-Once dependencies are complete (see above), navigate to the `src/server` directory, set the `FLASK_APP` variable, and start the server:
+Once dependencies are complete (see above), set the `FLASK_APP` variable, and start the server:
 
 ```
-cd src/server
-export FLASK_APP=run.py
+export FLASK_APP=src/run.py
 flask run
 ```
+
+### Command Line Utility
+
+The validation service can also be run over a file directly from the command line using `src/validate.py`:
+
+```
+python3 src/validate.py [CELL_NAMES] [CELL_LEVELS] [GATE_NAMES] [INPUT] > [OUTPUT_TSV]
+```
+
+The first three input files can be found in the `build/` directory after building the dependencies:
+* **CELL_NAMES** (`build/cell.tsv`): Cell Ontology IDs & labels and/or synonyms (each distinct label or synonym has its own line, and IDs may be repeated)
+* **CELL_LEVELS** (`build/cl-levels.tsv`): Membrane parts for each Cell Ontology term (positive, negative, high, and low)
+* **GATE_NAMES** (`build/marker.tsv`): Protein Ontology IDs & labels and/or synonyms (each distinct label or synonym has its own line, and IDs may be repeated)
+
+The input file should be the cell population & gates to validate. This file requires two columns:
+* **Cell Population Name**: The cell type from the Cell Ontology
+* **Gating Definition**: Comma-separated gates from the Protein Ontology
