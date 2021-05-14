@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="mt-3">Cell Name and Marker Validator Examples</h1>
+
+<p class="lead">
+  The following examples show valid and invalid cell name and marker tables.
+</p>
+
+<h2 id="valid-example">Valid Example</h2>
+
+{% include "valid.html" %}
+
+<h2 id="invalid-example">Invalid Example</h2>
+
+{% include "invalid.html" %}
+
+{% endblock %}

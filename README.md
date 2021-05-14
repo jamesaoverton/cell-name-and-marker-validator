@@ -13,10 +13,40 @@ There are two ways to use this code:
 
 See the [`Makefile`](Makefile) for software requirements and build tasks.
 
+First, install requirements (optionally, use a virtual environment):
+```
+python3 -m pip install -r requirements.txt
+```
+
+Then, `make` all dependencies:
+```
+make all
+```
+
+The first time you run this, it must download the full Protein Ontology which can take some time. Subsequent builds with an existing `build/` directory will be faster.
+
 ### Web Service
 
-The [`src/server.py`](src/server.py) script will run a simple web service allowing users to submit their cell type and gating strategy and get a validation result immediately. It uses the Python [Flask](http://flask.pocoo.org) module. The `make server` task will prepare the various tables and ontologies required for the server, then run `python3 src/server.py` and navigate to `http://localhost:5000`.
+Once dependencies are complete (see above), set the `FLASK_APP` variable, and start the server:
 
-### Batch Processing
+```
+export FLASK_APP=src/run.py
+flask run
+```
 
-Supply a `source.tsv` file with columns: NAME, STUDY_ACCESSION, EXPERIMENT_ACCESSION, POPULATION_NAME_REPORTED, POPULATION_DEFNITION_REPORTED [sic]. Then run `make all` and look at `build/normalized.tsv`, `build/report2.tsv`, and `build/summary.tsv`.
+### Command Line Utility
+
+The validation service can also be run over a file directly from the command line using `src/validate.py`:
+
+```
+python3 src/validate.py [CELL_NAMES] [CELL_LEVELS] [GATE_NAMES] [INPUT] > [OUTPUT_TSV]
+```
+
+The first three input files can be found in the `build/` directory after building the dependencies:
+* **CELL_NAMES** (`build/cell.tsv`): Cell Ontology IDs & labels and/or synonyms (each distinct label or synonym has its own line, and IDs may be repeated)
+* **CELL_LEVELS** (`build/cl-levels.tsv`): Membrane parts for each Cell Ontology term (positive, negative, high, and low)
+* **GATE_NAMES** (`build/marker.tsv`): Protein Ontology IDs & labels and/or synonyms (each distinct label or synonym has its own line, and IDs may be repeated)
+
+The input file should be the cell population & gates to validate. This file requires two columns:
+* **Cell Population Name**: The cell type from the Cell Ontology
+* **Gating Definition**: Comma-separated gates from the Protein Ontology

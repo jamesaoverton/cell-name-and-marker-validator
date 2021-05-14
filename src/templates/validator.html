@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="mt-3">Cell Name and Marker Validator</h1>
+
+<form method="POST" enctype="multipart/form-data">
+  <ol>
+    <li class="m-2">
+        Follow the <a href="/instructions">instructions</a>
+        to fill the template
+    </li>
+    <li class="m-2">
+      <label for="file">Upload your filled template:</label>
+      <input id="file" name="file" type="file"/>
+    </li>
+    <li class="m-2">
+      <input type="submit" class="btn btn-primary" value="Validate"/>
+    </li>
+  </ol>
+</form>
+
+{{ message|safe }}
+
+{% endblock %}
