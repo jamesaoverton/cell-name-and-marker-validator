@@ -1,0 +1,11 @@
+populationNameReported	populationDefnitionReported
+basophil	CD66b-, CD123+, CD294+, CD38+, HLADR-
+transitional stage B cell	CD66b-, CD45+, CD19+, CD20+, CD27-, IgD+, CD38+, CD39-
+unswitched memory B cell	CD66b-, CD45+, CD19+, CD20+, CD27-, IgD+
+plasmablast	CD66b-, CD45, CD19, CD20-, CD38+, CD27+, CD71+
+CD16-negative, CD56-bright natural killer cell, human	CD66b-, CD45+, CD3-, CD56+, CD16-
+CD16-positive, CD56-dim natural killer cell, human"	CD66b-, CD45+, CD3-, CD56, CD16+, CD57+
+CD16-positive, CD56-dim natural killer cell, human"	CD66b-, CD45+, CD3-, CD56, CD16+, CD57-
+CD4-positive, alpha-beta T cell	CD66b-, CD45+, CD3+, CD4+
+CD4-positive, alpha-beta T cell	CD66b-, CD45+, CD3+, CD4+, CD25-, CD127+
+CD4-positive, CD25-positive, alpha-beta regulatory T cell	CD66b-, CD45+, CD3+, CD4+, CD25+, CD127-

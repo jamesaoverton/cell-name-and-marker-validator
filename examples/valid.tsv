@@ -1,0 +1,11 @@
+populationNameReported	populationDefnitionReported
+neutrophil	CD66b+, CD16-, CD294-
+neutrophil	CD66b+, CD16+, CD294-
+eosinophil	CD66b+, CD16+, CD294+
+naive B cell	CD66b-, CD45+, CD19+, CD20+, CD27-, IgD+
+class switched memory B cell	CD66b-, CD45+, CD19+, CD20+, CD27+, IgD-
+IgD-negative memory B cell	CD66b-, CD45+, CD19+, CD20+, CD27-, IgD-
+B cell	CD66b-, CD45+, CD19+, CD20+, CD11c+, CXCR5-
+B cell	CD66b-, CD45+, CD19+, CD20+, CD71+
+mature NK T cell	CD66b-, CD45+, CD3+, CD56+, CD4+
+mature NK T cell	CD66b-, CD45+, CD3+, CD56+, CD8+
