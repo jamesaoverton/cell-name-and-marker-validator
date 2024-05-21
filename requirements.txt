@@ -1,6 +1,6 @@
 Flask==2.3.2
 pytest==3.6.0
-requests==2.31.0
+requests==2.32.0
 git+https://github.com/ontodev/gizmos.git@logical-axs
 git+https://github.com/ontodev/valve.py.git
 jsonschema
